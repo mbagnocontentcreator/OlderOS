@@ -1,0 +1,42 @@
+# Flutter/Dart
+.dart_tool/
+.packages
+build/
+.flutter-plugins
+.flutter-plugins-dependencies
+*.iml
+
+# Pub
+.pub-cache/
+.pub/
+pubspec.lock
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# macOS
+.DS_Store
+._*
+
+# Linux build
+*.exe
+*.dll
+*.so
+*.dylib
+
+# Generated files
+*.g.dart
+*.freezed.dart
+
+# Test
+coverage/
+
+# Misc
+*.log
+.env
+
+# Claude Code
+.claude/
