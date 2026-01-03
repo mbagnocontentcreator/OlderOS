@@ -4,7 +4,6 @@ import 'package:intl/date_symbol_data_local.dart';
 import '../theme/olderos_theme.dart';
 import '../widgets/app_card.dart';
 import '../widgets/big_button.dart';
-import 'app_screen.dart';
 import 'browser_screen.dart';
 import 'photos_screen.dart';
 import 'writer_screen.dart';
@@ -36,18 +35,6 @@ class _HomeScreenState extends State<HomeScreen> {
     _formattedDate = DateFormat('EEEE d MMMM', 'it_IT').format(now);
     _formattedDate = _formattedDate[0].toUpperCase() + _formattedDate.substring(1);
     _formattedTime = DateFormat('HH:mm').format(now);
-  }
-
-  void _openApp(String appName, IconData icon, Color color) {
-    Navigator.of(context).push(
-      MaterialPageRoute(
-        builder: (context) => AppScreen(
-          title: appName,
-          icon: icon,
-          color: color,
-        ),
-      ),
-    );
   }
 
   void _openBrowser() {

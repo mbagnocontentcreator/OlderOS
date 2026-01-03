@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import '../theme/olderos_theme.dart';
 import 'photos_screen.dart';
 
 class PhotoViewerScreen extends StatefulWidget {

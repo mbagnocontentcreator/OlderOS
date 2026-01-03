@@ -130,7 +130,6 @@ class _PhotoThumbnailState extends State<_PhotoThumbnail> {
   bool _isHovered = false;
   bool _isPressed = false;
   bool _isLoading = true;
-  bool _hasError = false;
 
   @override
   Widget build(BuildContext context) {
