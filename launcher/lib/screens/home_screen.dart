@@ -7,6 +7,7 @@ import '../widgets/big_button.dart';
 import 'app_screen.dart';
 import 'browser_screen.dart';
 import 'photos_screen.dart';
+import 'writer_screen.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -58,6 +59,14 @@ class _HomeScreenState extends State<HomeScreen> {
     Navigator.of(context).push(
       MaterialPageRoute(
         builder: (context) => const PhotosScreen(),
+      ),
+    );
+  }
+
+  void _openWriter() {
+    Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (context) => const WriterScreen(),
       ),
     );
   }
@@ -220,7 +229,7 @@ class _HomeScreenState extends State<HomeScreen> {
                         label: 'SCRIVERE',
                         icon: Icons.edit_document,
                         iconColor: OlderOSTheme.writerColor,
-                        onTap: () => _openApp('SCRIVERE', Icons.edit_document, OlderOSTheme.writerColor),
+                        onTap: _openWriter,
                       ),
                       AppCard(
                         label: 'FOTO',
