@@ -9,6 +9,7 @@ import 'browser_screen.dart';
 import 'photos_screen.dart';
 import 'writer_screen.dart';
 import 'settings_screen.dart';
+import 'email_screen.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -76,6 +77,14 @@ class _HomeScreenState extends State<HomeScreen> {
     Navigator.of(context).push(
       MaterialPageRoute(
         builder: (context) => const SettingsScreen(),
+      ),
+    );
+  }
+
+  void _openEmail() {
+    Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (context) => const EmailScreen(),
       ),
     );
   }
@@ -232,7 +241,7 @@ class _HomeScreenState extends State<HomeScreen> {
                         label: 'POSTA',
                         icon: Icons.email,
                         iconColor: OlderOSTheme.emailColor,
-                        onTap: () => _openApp('POSTA', Icons.email, OlderOSTheme.emailColor),
+                        onTap: _openEmail,
                       ),
                       AppCard(
                         label: 'SCRIVERE',
