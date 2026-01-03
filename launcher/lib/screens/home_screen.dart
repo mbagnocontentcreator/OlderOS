@@ -5,6 +5,7 @@ import '../theme/olderos_theme.dart';
 import '../widgets/app_card.dart';
 import '../widgets/big_button.dart';
 import 'app_screen.dart';
+import 'browser_screen.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -40,6 +41,14 @@ class _HomeScreenState extends State<HomeScreen> {
           icon: icon,
           color: color,
         ),
+      ),
+    );
+  }
+
+  void _openBrowser() {
+    Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (context) => const BrowserScreen(),
       ),
     );
   }
@@ -190,7 +199,7 @@ class _HomeScreenState extends State<HomeScreen> {
                         label: 'INTERNET',
                         icon: Icons.language,
                         iconColor: OlderOSTheme.internetColor,
-                        onTap: () => _openApp('INTERNET', Icons.language, OlderOSTheme.internetColor),
+                        onTap: _openBrowser,
                       ),
                       AppCard(
                         label: 'POSTA',
