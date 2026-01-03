@@ -10,6 +10,7 @@ import 'photos_screen.dart';
 import 'writer_screen.dart';
 import 'settings_screen.dart';
 import 'email_screen.dart';
+import 'videocall_screen.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -85,6 +86,14 @@ class _HomeScreenState extends State<HomeScreen> {
     Navigator.of(context).push(
       MaterialPageRoute(
         builder: (context) => const EmailScreen(),
+      ),
+    );
+  }
+
+  void _openVideocall() {
+    Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (context) => const VideocallScreen(),
       ),
     );
   }
@@ -259,7 +268,7 @@ class _HomeScreenState extends State<HomeScreen> {
                         label: 'VIDEOCHIAMATA',
                         icon: Icons.videocam,
                         iconColor: OlderOSTheme.videoCallColor,
-                        onTap: () => _openApp('VIDEOCHIAMATA', Icons.videocam, OlderOSTheme.videoCallColor),
+                        onTap: _openVideocall,
                       ),
                       AppCard(
                         label: 'IMPOSTAZIONI',
