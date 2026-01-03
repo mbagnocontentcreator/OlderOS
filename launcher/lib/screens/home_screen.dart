@@ -8,6 +8,7 @@ import 'app_screen.dart';
 import 'browser_screen.dart';
 import 'photos_screen.dart';
 import 'writer_screen.dart';
+import 'settings_screen.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -67,6 +68,14 @@ class _HomeScreenState extends State<HomeScreen> {
     Navigator.of(context).push(
       MaterialPageRoute(
         builder: (context) => const WriterScreen(),
+      ),
+    );
+  }
+
+  void _openSettings() {
+    Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (context) => const SettingsScreen(),
       ),
     );
   }
@@ -247,7 +256,7 @@ class _HomeScreenState extends State<HomeScreen> {
                         label: 'IMPOSTAZIONI',
                         icon: Icons.settings,
                         iconColor: OlderOSTheme.settingsColor,
-                        onTap: () => _openApp('IMPOSTAZIONI', Icons.settings, OlderOSTheme.settingsColor),
+                        onTap: _openSettings,
                       ),
                     ],
                   ),

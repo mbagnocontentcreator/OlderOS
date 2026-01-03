@@ -1,0 +1,743 @@
+import 'package:flutter/material.dart';
+import '../theme/olderos_theme.dart';
+import '../widgets/top_bar.dart';
+
+class SettingsScreen extends StatefulWidget {
+  const SettingsScreen({super.key});
+
+  @override
+  State<SettingsScreen> createState() => _SettingsScreenState();
+}
+
+class _SettingsScreenState extends State<SettingsScreen> {
+  double _brightness = 0.8;
+  double _volume = 0.6;
+  String _connectedWifi = 'Casa_Mario';
+  String _connectedPrinter = 'HP DeskJet 2700';
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      body: Column(
+        children: [
+          TopBar(
+            title: 'IMPOSTAZIONI',
+            onGoHome: () => Navigator.of(context).pop(),
+          ),
+          Expanded(
+            child: SingleChildScrollView(
+              padding: const EdgeInsets.all(OlderOSTheme.marginScreen),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  // Luminosita
+                  _SettingsCard(
+                    icon: Icons.brightness_6,
+                    iconColor: OlderOSTheme.warning,
+                    title: 'LUMINOSITA SCHERMO',
+                    child: _BrightnessSlider(
+                      value: _brightness,
+                      onChanged: (value) => setState(() => _brightness = value),
+                    ),
+                  ),
+
+                  const SizedBox(height: 20),
+
+                  // Volume
+                  _SettingsCard(
+                    icon: Icons.volume_up,
+                    iconColor: OlderOSTheme.primary,
+                    title: 'VOLUME SUONI',
+                    child: _VolumeSlider(
+                      value: _volume,
+                      onChanged: (value) => setState(() => _volume = value),
+                    ),
+                  ),
+
+                  const SizedBox(height: 20),
+
+                  // WiFi
+                  _SettingsCard(
+                    icon: Icons.wifi,
+                    iconColor: OlderOSTheme.success,
+                    title: 'RETE WIFI',
+                    trailing: _StatusBadge(
+                      label: 'Connesso',
+                      color: OlderOSTheme.success,
+                    ),
+                    child: _WifiSection(
+                      connectedNetwork: _connectedWifi,
+                      onChangeNetwork: () => _showWifiDialog(),
+                    ),
+                  ),
+
+                  const SizedBox(height: 20),
+
+                  // Stampante
+                  _SettingsCard(
+                    icon: Icons.print,
+                    iconColor: OlderOSTheme.videoCallColor,
+                    title: 'STAMPANTE',
+                    trailing: _StatusBadge(
+                      label: 'Pronta',
+                      color: OlderOSTheme.success,
+                    ),
+                    child: _PrinterSection(
+                      connectedPrinter: _connectedPrinter,
+                      onTestPrint: () => _showTestPrintDialog(),
+                    ),
+                  ),
+
+                  const SizedBox(height: 20),
+
+                  // Aiuto a distanza
+                  _SettingsCard(
+                    icon: Icons.support_agent,
+                    iconColor: OlderOSTheme.emailColor,
+                    title: 'CHIEDI AIUTO A DISTANZA',
+                    child: _HelpSection(
+                      onRequestHelp: () => _showHelpDialog(),
+                    ),
+                  ),
+
+                  const SizedBox(height: 20),
+
+                  // Info sistema
+                  _SettingsCard(
+                    icon: Icons.info_outline,
+                    iconColor: OlderOSTheme.textSecondary,
+                    title: 'INFORMAZIONI',
+                    child: _InfoSection(),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _showWifiDialog() {
+    showDialog(
+      context: context,
+      builder: (context) => _WifiDialog(
+        currentNetwork: _connectedWifi,
+        onConnect: (network) {
+          setState(() => _connectedWifi = network);
+          Navigator.of(context).pop();
+          _showConnectionSuccess(network);
+        },
+      ),
+    );
+  }
+
+  void _showConnectionSuccess(String network) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Row(
+          children: [
+            const Icon(Icons.wifi, color: Colors.white, size: 28),
+            const SizedBox(width: 12),
+            Text(
+              'Connesso a $network',
+              style: const TextStyle(fontSize: 20),
+            ),
+          ],
+        ),
+        backgroundColor: OlderOSTheme.success,
+        duration: const Duration(seconds: 2),
+        behavior: SnackBarBehavior.floating,
+        margin: const EdgeInsets.all(16),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+      ),
+    );
+  }
+
+  void _showTestPrintDialog() {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(OlderOSTheme.borderRadiusCard),
+        ),
+        title: Row(
+          children: [
+            Icon(Icons.print, size: 32, color: OlderOSTheme.success),
+            const SizedBox(width: 12),
+            Text(
+              'Stampa di prova',
+              style: Theme.of(context).textTheme.displayMedium,
+            ),
+          ],
+        ),
+        content: Text(
+          'Pagina di prova inviata alla stampante!',
+          style: Theme.of(context).textTheme.bodyLarge,
+        ),
+        actions: [
+          ElevatedButton(
+            onPressed: () => Navigator.of(context).pop(),
+            child: const Text('OK', style: TextStyle(fontSize: 20)),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _showHelpDialog() {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(OlderOSTheme.borderRadiusCard),
+        ),
+        title: Row(
+          children: [
+            Icon(Icons.support_agent, size: 32, color: OlderOSTheme.primary),
+            const SizedBox(width: 12),
+            Text(
+              'Aiuto a distanza',
+              style: Theme.of(context).textTheme.displayMedium,
+            ),
+          ],
+        ),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              'Questa funzione permettera a un familiare di vedere il tuo schermo e aiutarti.',
+              style: Theme.of(context).textTheme.bodyLarge,
+            ),
+            const SizedBox(height: 16),
+            Text(
+              'Funzione disponibile prossimamente.',
+              style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                fontStyle: FontStyle.italic,
+              ),
+            ),
+          ],
+        ),
+        actions: [
+          ElevatedButton(
+            onPressed: () => Navigator.of(context).pop(),
+            child: const Text('OK', style: TextStyle(fontSize: 20)),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _SettingsCard extends StatelessWidget {
+  final IconData icon;
+  final Color iconColor;
+  final String title;
+  final Widget? trailing;
+  final Widget child;
+
+  const _SettingsCard({
+    required this.icon,
+    required this.iconColor,
+    required this.title,
+    this.trailing,
+    required this.child,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.all(24),
+      decoration: BoxDecoration(
+        color: OlderOSTheme.cardBackground,
+        borderRadius: BorderRadius.circular(OlderOSTheme.borderRadiusCard),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.08),
+            blurRadius: 8,
+            offset: const Offset(0, 2),
+          ),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Icon(icon, size: 32, color: iconColor),
+              const SizedBox(width: 16),
+              Expanded(
+                child: Text(
+                  title,
+                  style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+              ),
+              if (trailing != null) trailing!,
+            ],
+          ),
+          const SizedBox(height: 20),
+          child,
+        ],
+      ),
+    );
+  }
+}
+
+class _StatusBadge extends StatelessWidget {
+  final String label;
+  final Color color;
+
+  const _StatusBadge({
+    required this.label,
+    required this.color,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+      decoration: BoxDecoration(
+        color: color.withOpacity(0.15),
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(color: color, width: 2),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(Icons.check_circle, size: 20, color: color),
+          const SizedBox(width: 8),
+          Text(
+            label,
+            style: TextStyle(
+              fontSize: 18,
+              fontWeight: FontWeight.w600,
+              color: color,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _BrightnessSlider extends StatelessWidget {
+  final double value;
+  final ValueChanged<double> onChanged;
+
+  const _BrightnessSlider({
+    required this.value,
+    required this.onChanged,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      children: [
+        Icon(
+          Icons.brightness_low,
+          size: 32,
+          color: OlderOSTheme.textSecondary,
+        ),
+        Expanded(
+          child: SliderTheme(
+            data: SliderTheme.of(context).copyWith(
+              trackHeight: 12,
+              thumbShape: const RoundSliderThumbShape(enabledThumbRadius: 16),
+              overlayShape: const RoundSliderOverlayShape(overlayRadius: 28),
+            ),
+            child: Slider(
+              value: value,
+              onChanged: onChanged,
+              activeColor: OlderOSTheme.warning,
+              inactiveColor: OlderOSTheme.warning.withOpacity(0.3),
+            ),
+          ),
+        ),
+        Icon(
+          Icons.brightness_high,
+          size: 32,
+          color: OlderOSTheme.warning,
+        ),
+      ],
+    );
+  }
+}
+
+class _VolumeSlider extends StatelessWidget {
+  final double value;
+  final ValueChanged<double> onChanged;
+
+  const _VolumeSlider({
+    required this.value,
+    required this.onChanged,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      children: [
+        Icon(
+          Icons.volume_mute,
+          size: 32,
+          color: OlderOSTheme.textSecondary,
+        ),
+        Expanded(
+          child: SliderTheme(
+            data: SliderTheme.of(context).copyWith(
+              trackHeight: 12,
+              thumbShape: const RoundSliderThumbShape(enabledThumbRadius: 16),
+              overlayShape: const RoundSliderOverlayShape(overlayRadius: 28),
+            ),
+            child: Slider(
+              value: value,
+              onChanged: onChanged,
+              activeColor: OlderOSTheme.primary,
+              inactiveColor: OlderOSTheme.primary.withOpacity(0.3),
+            ),
+          ),
+        ),
+        Icon(
+          Icons.volume_up,
+          size: 32,
+          color: OlderOSTheme.primary,
+        ),
+      ],
+    );
+  }
+}
+
+class _WifiSection extends StatelessWidget {
+  final String connectedNetwork;
+  final VoidCallback onChangeNetwork;
+
+  const _WifiSection({
+    required this.connectedNetwork,
+    required this.onChangeNetwork,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      children: [
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                'Rete attuale:',
+                style: Theme.of(context).textTheme.bodyMedium,
+              ),
+              const SizedBox(height: 4),
+              Text(
+                connectedNetwork,
+                style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+            ],
+          ),
+        ),
+        _ActionButton(
+          label: 'CAMBIA RETE',
+          onTap: onChangeNetwork,
+        ),
+      ],
+    );
+  }
+}
+
+class _PrinterSection extends StatelessWidget {
+  final String connectedPrinter;
+  final VoidCallback onTestPrint;
+
+  const _PrinterSection({
+    required this.connectedPrinter,
+    required this.onTestPrint,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      children: [
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                'Stampante attuale:',
+                style: Theme.of(context).textTheme.bodyMedium,
+              ),
+              const SizedBox(height: 4),
+              Text(
+                connectedPrinter,
+                style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+            ],
+          ),
+        ),
+        _ActionButton(
+          label: 'STAMPA PROVA',
+          onTap: onTestPrint,
+        ),
+      ],
+    );
+  }
+}
+
+class _HelpSection extends StatelessWidget {
+  final VoidCallback onRequestHelp;
+
+  const _HelpSection({required this.onRequestHelp});
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          'Se hai bisogno di aiuto, un familiare puo vedere il tuo schermo e guidarti.',
+          style: Theme.of(context).textTheme.bodyLarge,
+        ),
+        const SizedBox(height: 16),
+        _ActionButton(
+          label: 'RICHIEDI AIUTO',
+          color: OlderOSTheme.emailColor,
+          onTap: onRequestHelp,
+        ),
+      ],
+    );
+  }
+}
+
+class _InfoSection extends StatelessWidget {
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        _InfoRow(label: 'Versione', value: 'OlderOS 1.0'),
+        const SizedBox(height: 12),
+        _InfoRow(label: 'Sistema', value: 'Ubuntu 24.04 LTS'),
+        const SizedBox(height: 12),
+        _InfoRow(label: 'Ultimo aggiornamento', value: 'Oggi'),
+      ],
+    );
+  }
+}
+
+class _InfoRow extends StatelessWidget {
+  final String label;
+  final String value;
+
+  const _InfoRow({required this.label, required this.value});
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      children: [
+        Text(
+          '$label: ',
+          style: Theme.of(context).textTheme.bodyMedium,
+        ),
+        Text(
+          value,
+          style: Theme.of(context).textTheme.bodyLarge?.copyWith(
+            fontWeight: FontWeight.w600,
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+class _ActionButton extends StatefulWidget {
+  final String label;
+  final Color? color;
+  final VoidCallback onTap;
+
+  const _ActionButton({
+    required this.label,
+    this.color,
+    required this.onTap,
+  });
+
+  @override
+  State<_ActionButton> createState() => _ActionButtonState();
+}
+
+class _ActionButtonState extends State<_ActionButton> {
+  bool _isHovered = false;
+
+  @override
+  Widget build(BuildContext context) {
+    final color = widget.color ?? OlderOSTheme.primary;
+
+    return MouseRegion(
+      onEnter: (_) => setState(() => _isHovered = true),
+      onExit: (_) => setState(() => _isHovered = false),
+      child: GestureDetector(
+        onTap: widget.onTap,
+        child: Container(
+          padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 14),
+          decoration: BoxDecoration(
+            color: _isHovered ? color : Colors.transparent,
+            borderRadius: BorderRadius.circular(12),
+            border: Border.all(color: color, width: 2),
+          ),
+          child: Text(
+            widget.label,
+            style: TextStyle(
+              fontSize: 18,
+              fontWeight: FontWeight.w600,
+              color: _isHovered ? Colors.white : color,
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _WifiDialog extends StatelessWidget {
+  final String currentNetwork;
+  final ValueChanged<String> onConnect;
+
+  const _WifiDialog({
+    required this.currentNetwork,
+    required this.onConnect,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final networks = [
+      'Casa_Mario',
+      'Vicino_WiFi',
+      'TIM-28374',
+      'Vodafone-A83B',
+    ];
+
+    return AlertDialog(
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(OlderOSTheme.borderRadiusCard),
+      ),
+      title: Row(
+        children: [
+          Icon(Icons.wifi, size: 32, color: OlderOSTheme.success),
+          const SizedBox(width: 12),
+          Text(
+            'Scegli rete WiFi',
+            style: Theme.of(context).textTheme.displayMedium,
+          ),
+        ],
+      ),
+      content: SizedBox(
+        width: 400,
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: networks.map((network) {
+            final isConnected = network == currentNetwork;
+            return Padding(
+              padding: const EdgeInsets.only(bottom: 8),
+              child: _WifiNetworkTile(
+                name: network,
+                isConnected: isConnected,
+                onTap: () => onConnect(network),
+              ),
+            );
+          }).toList(),
+        ),
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.of(context).pop(),
+          child: Text(
+            'Annulla',
+            style: TextStyle(
+              fontSize: 20,
+              color: OlderOSTheme.textSecondary,
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+class _WifiNetworkTile extends StatefulWidget {
+  final String name;
+  final bool isConnected;
+  final VoidCallback onTap;
+
+  const _WifiNetworkTile({
+    required this.name,
+    required this.isConnected,
+    required this.onTap,
+  });
+
+  @override
+  State<_WifiNetworkTile> createState() => _WifiNetworkTileState();
+}
+
+class _WifiNetworkTileState extends State<_WifiNetworkTile> {
+  bool _isHovered = false;
+
+  @override
+  Widget build(BuildContext context) {
+    return MouseRegion(
+      onEnter: (_) => setState(() => _isHovered = true),
+      onExit: (_) => setState(() => _isHovered = false),
+      child: GestureDetector(
+        onTap: widget.onTap,
+        child: Container(
+          padding: const EdgeInsets.all(16),
+          decoration: BoxDecoration(
+            color: widget.isConnected
+                ? OlderOSTheme.success.withOpacity(0.1)
+                : (_isHovered ? Colors.grey.shade100 : Colors.transparent),
+            borderRadius: BorderRadius.circular(12),
+            border: Border.all(
+              color: widget.isConnected
+                  ? OlderOSTheme.success
+                  : (_isHovered ? OlderOSTheme.primary : Colors.grey.shade300),
+              width: 2,
+            ),
+          ),
+          child: Row(
+            children: [
+              Icon(
+                Icons.wifi,
+                size: 28,
+                color: widget.isConnected
+                    ? OlderOSTheme.success
+                    : OlderOSTheme.textPrimary,
+              ),
+              const SizedBox(width: 16),
+              Expanded(
+                child: Text(
+                  widget.name,
+                  style: TextStyle(
+                    fontSize: 20,
+                    fontWeight: widget.isConnected
+                        ? FontWeight.bold
+                        : FontWeight.normal,
+                  ),
+                ),
+              ),
+              if (widget.isConnected)
+                Icon(
+                  Icons.check_circle,
+                  size: 28,
+                  color: OlderOSTheme.success,
+                ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
