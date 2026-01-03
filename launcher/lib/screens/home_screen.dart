@@ -6,6 +6,7 @@ import '../widgets/app_card.dart';
 import '../widgets/big_button.dart';
 import 'app_screen.dart';
 import 'browser_screen.dart';
+import 'photos_screen.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -49,6 +50,14 @@ class _HomeScreenState extends State<HomeScreen> {
     Navigator.of(context).push(
       MaterialPageRoute(
         builder: (context) => const BrowserScreen(),
+      ),
+    );
+  }
+
+  void _openPhotos() {
+    Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (context) => const PhotosScreen(),
       ),
     );
   }
@@ -217,7 +226,7 @@ class _HomeScreenState extends State<HomeScreen> {
                         label: 'FOTO',
                         icon: Icons.photo_library,
                         iconColor: OlderOSTheme.photosColor,
-                        onTap: () => _openApp('FOTO', Icons.photo_library, OlderOSTheme.photosColor),
+                        onTap: _openPhotos,
                       ),
                       AppCard(
                         label: 'VIDEOCHIAMATA',
