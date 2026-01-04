@@ -163,9 +163,19 @@ dependencies:
 
 ---
 
+## Test Linux Completato
+
+**OlderOS testato con successo su Ubuntu 24.04 ARM64 in VM UTM**
+
+- Tutte le 6 app funzionanti
+- Interfaccia responsive
+- Navigazione fluida
+
+---
+
 ## Prossimi Passi
 
-1. **Test su Linux/Ubuntu** - Verificare funzionamento su target OS
+1. ~~**Test su Linux/Ubuntu** - Verificare funzionamento su target OS~~ FATTO
 2. **Persistenza dati** - Salvare documenti, email, impostazioni
 3. **Foto reali** - Accesso a cartella foto utente
 4. **Email reale** - Integrazione IMAP/SMTP
@@ -174,9 +184,58 @@ dependencies:
 
 ---
 
+## CI/CD - GitHub Actions
+
+### Workflow Linux Build (`.github/workflows/build-linux.yml`)
+- Trigger: push/PR su main
+- Runner: ubuntu-latest
+- Steps:
+  1. Install Linux dependencies (clang, cmake, GTK3, etc.)
+  2. Setup Flutter (stable channel, cached)
+  3. flutter pub get
+  4. flutter analyze
+  5. flutter build linux --release
+  6. Upload artifact (retention 7 giorni)
+
+### Artifact
+- Nome: `olderos-launcher-linux`
+- Contenuto: bundle completo eseguibile
+- Download: https://github.com/mbagnocontentcreator/OlderOS/actions
+
+---
+
+## Test Environment - UTM + Ubuntu
+
+### Configurazione VM
+- **Virtualizzatore**: UTM 4.7.5
+- **OS Guest**: Ubuntu 22.04 Desktop ARM64
+- **RAM**: 4-8 GB
+- **CPU**: 2-4 cores
+- **Storage**: 25+ GB
+
+### Setup Flutter in Ubuntu VM
+```bash
+# Dipendenze
+sudo apt install -y git curl clang cmake ninja-build pkg-config libgtk-3-dev liblzma-dev
+
+# Flutter
+git clone https://github.com/flutter/flutter.git ~/flutter
+echo 'export PATH="$HOME/flutter/bin:$PATH"' >> ~/.bashrc
+source ~/.bashrc
+
+# OlderOS
+git clone https://github.com/mbagnocontentcreator/OlderOS.git
+cd OlderOS/launcher
+flutter pub get
+flutter run -d linux
+```
+
+---
+
 ## Note Tecniche
 
-- **Piattaforma sviluppo**: macOS (Darwin 25.1.0)
+- **Piattaforma sviluppo**: macOS (Darwin 25.1.0) - Apple Silicon
 - **Flutter version**: 3.38.5
 - **Target platforms**: Linux, macOS
 - **Repository**: https://github.com/mbagnocontentcreator/OlderOS
+- **CI/CD**: GitHub Actions (Linux build automatico)
