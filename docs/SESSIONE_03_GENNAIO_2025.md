@@ -176,11 +176,90 @@ dependencies:
 ## Prossimi Passi
 
 1. ~~**Test su Linux/Ubuntu** - Verificare funzionamento su target OS~~ FATTO
-2. **Persistenza dati** - Salvare documenti, email, impostazioni
-3. **Foto reali** - Accesso a cartella foto utente
-4. **Email reale** - Integrazione IMAP/SMTP
-5. **Accessibilita** - Screen reader, navigazione tastiera completa
-6. **Installer** - Pacchetto .deb per Ubuntu
+
+---
+
+## Roadmap: Da UI Mock a OS Reale
+
+### Stato Attuale
+OlderOS e attualmente una **UI Shell** - l'interfaccia grafica funziona ma non e connessa al sistema Linux sottostante. Le funzionalita sono simulate (mock).
+
+### Architettura Target
+
+```
+┌─────────────────────────────────────────┐
+│         Flutter UI (Launcher)           │  ← Completato
+├─────────────────────────────────────────┤
+│         Platform Channels (Dart ↔ C)    │  ← Da costruire
+├─────────────────────────────────────────┤
+│         Linux System APIs               │
+│  • D-Bus (sistema, rete, audio)         │
+│  • PulseAudio/PipeWire (volume)         │
+│  • NetworkManager (WiFi)                │
+│  • UPower (batteria)                    │
+│  • Filesystem (foto, documenti)         │
+├─────────────────────────────────────────┤
+│         Ubuntu Linux Base               │
+└─────────────────────────────────────────┘
+```
+
+### Confronto Mock vs Reale
+
+| Componente | Stato Attuale (Mock) | Implementazione Reale |
+|------------|----------------------|-----------------------|
+| Browser | WebView non naviga | Integrare webkit2gtk per Linux |
+| Luminosita | Slider cosmetico | Chiamare xrandr o D-Bus |
+| Volume | Slider cosmetico | PulseAudio/PipeWire API |
+| WiFi | Lista statica | NetworkManager via D-Bus |
+| Email | Dati in memoria | IMAP/SMTP reale |
+| Foto | Immagini da web | Leggere ~/Immagini |
+| Documenti | In memoria | Salvare su ~/Documenti |
+| Spegnimento | Dialog finto | systemctl poweroff |
+
+### Fasi di Implementazione
+
+#### Fase 1: Funzionalita Base (Facile)
+- [ ] Browser: Debug WebView su Linux
+- [ ] Foto: Leggere file da ~/Immagini
+- [ ] Documenti: Salvare/caricare .txt da ~/Documenti
+- **Stima: 2-4 sessioni**
+
+#### Fase 2: Integrazione Sistema (Media)
+- [ ] Volume: pactl o PipeWire D-Bus
+- [ ] Luminosita: xrandr --brightness o /sys/class/backlight
+- [ ] WiFi: NetworkManager D-Bus API
+- [ ] Spegnimento reale: systemctl poweroff
+- **Stima: 4-6 sessioni**
+
+#### Fase 3: Funzionalita Avanzate (Complessa)
+- [ ] Email: Client IMAP/SMTP completo
+- [ ] Videochiamata: Jitsi embedded o WebRTC
+- [ ] Stampa: CUPS integration
+- **Stima: 5-8 sessioni**
+
+#### Fase 4: Diventare Shell di Sistema (Media)
+- [ ] Configurare autostart al login
+- [ ] Sostituire GNOME come shell predefinita
+- [ ] Disabilitare accesso desktop normale
+- [ ] Gestione sessione utente
+- **Stima: 2-3 sessioni**
+
+#### Fase 5: Distribuzione (Complessa)
+- [ ] Pacchetto .deb per installazione
+- [ ] Script di configurazione automatica
+- [ ] ISO Ubuntu personalizzata con OlderOS preinstallato
+- [ ] Documentazione utente finale
+- **Stima: 3-5 sessioni**
+
+### Priorita Suggerita
+1. **Browser funzionante** - E' la funzione piu usata
+2. **Foto reali** - Semplice da implementare, grande impatto
+3. **Documenti persistenti** - Essenziale per utilita reale
+4. **Volume/Luminosita** - Feedback immediato, migliora UX
+5. **Spegnimento reale** - Necessario per uso quotidiano
+6. **WiFi** - Importante ma piu complesso
+7. **Email** - Complessa, puo essere rimandata
+8. **Shell/ISO** - Fase finale di produzione
 
 ---
 
