@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import '../theme/olderos_theme.dart';
 import '../widgets/top_bar.dart';
+import '../services/email_service.dart';
 
 class SettingsScreen extends StatefulWidget {
   const SettingsScreen({super.key});
@@ -97,6 +98,23 @@ class _SettingsScreenState extends State<SettingsScreen> {
                     title: 'CHIEDI AIUTO A DISTANZA',
                     child: _HelpSection(
                       onRequestHelp: () => _showHelpDialog(),
+                    ),
+                  ),
+
+                  const SizedBox(height: 20),
+
+                  // Configurazione Email/OAuth (per sviluppo)
+                  _SettingsCard(
+                    icon: Icons.settings,
+                    iconColor: OlderOSTheme.emailColor,
+                    title: 'CONFIGURAZIONE EMAIL',
+                    trailing: _StatusBadge(
+                      label: EmailService().isGoogleOAuthConfigured ? 'Configurato' : 'Da configurare',
+                      color: EmailService().isGoogleOAuthConfigured ? OlderOSTheme.success : OlderOSTheme.warning,
+                    ),
+                    child: _EmailConfigSection(
+                      onConfigure: () => _showOAuthConfigDialog(),
+                      onRemoveAccount: () => _showRemoveAccountDialog(),
                     ),
                   ),
 
@@ -223,6 +241,194 @@ class _SettingsScreenState extends State<SettingsScreen> {
           ElevatedButton(
             onPressed: () => Navigator.of(context).pop(),
             child: const Text('OK', style: TextStyle(fontSize: 20)),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _showOAuthConfigDialog() {
+    final clientIdController = TextEditingController();
+    final clientSecretController = TextEditingController();
+
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(OlderOSTheme.borderRadiusCard),
+        ),
+        title: Row(
+          children: [
+            Container(
+              padding: const EdgeInsets.all(8),
+              decoration: BoxDecoration(
+                color: OlderOSTheme.emailColor.withAlpha(30),
+                borderRadius: BorderRadius.circular(8),
+              ),
+              child: const Icon(Icons.key, size: 28, color: OlderOSTheme.emailColor),
+            ),
+            const SizedBox(width: 12),
+            Text(
+              'Credenziali Google OAuth',
+              style: Theme.of(context).textTheme.titleLarge,
+            ),
+          ],
+        ),
+        content: SizedBox(
+          width: 500,
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                'Inserisci le credenziali da Google Cloud Console:',
+                style: Theme.of(context).textTheme.bodyMedium,
+              ),
+              const SizedBox(height: 20),
+              TextField(
+                controller: clientIdController,
+                decoration: InputDecoration(
+                  labelText: 'Client ID',
+                  hintText: 'xxxxx.apps.googleusercontent.com',
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                ),
+              ),
+              const SizedBox(height: 16),
+              TextField(
+                controller: clientSecretController,
+                obscureText: true,
+                decoration: InputDecoration(
+                  labelText: 'Client Secret',
+                  hintText: 'GOCSPX-xxxxx',
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(),
+            child: const Text('Annulla', style: TextStyle(fontSize: 18)),
+          ),
+          ElevatedButton(
+            onPressed: () async {
+              if (clientIdController.text.isNotEmpty && clientSecretController.text.isNotEmpty) {
+                await EmailService().configureGoogleOAuth(
+                  clientId: clientIdController.text.trim(),
+                  clientSecret: clientSecretController.text.trim(),
+                );
+                if (mounted) {
+                  Navigator.of(context).pop();
+                  setState(() {}); // Refresh UI
+                  ScaffoldMessenger.of(this.context).showSnackBar(
+                    SnackBar(
+                      content: const Row(
+                        children: [
+                          Icon(Icons.check_circle, color: Colors.white, size: 28),
+                          SizedBox(width: 12),
+                          Text('Credenziali OAuth salvate!', style: TextStyle(fontSize: 18)),
+                        ],
+                      ),
+                      backgroundColor: OlderOSTheme.success,
+                      behavior: SnackBarBehavior.floating,
+                      margin: const EdgeInsets.all(16),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                    ),
+                  );
+                }
+              }
+            },
+            child: const Text('Salva', style: TextStyle(fontSize: 18)),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _showRemoveAccountDialog() {
+    final emailService = EmailService();
+
+    if (!emailService.isConfigured) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: const Text('Nessun account email configurato', style: TextStyle(fontSize: 18)),
+          backgroundColor: OlderOSTheme.warning,
+          behavior: SnackBarBehavior.floating,
+          margin: const EdgeInsets.all(16),
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+        ),
+      );
+      return;
+    }
+
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(OlderOSTheme.borderRadiusCard),
+        ),
+        title: Row(
+          children: [
+            const Icon(Icons.warning, size: 32, color: OlderOSTheme.danger),
+            const SizedBox(width: 12),
+            Text(
+              'Rimuovere account email?',
+              style: Theme.of(context).textTheme.titleLarge,
+            ),
+          ],
+        ),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              'Account attuale: ${emailService.userEmail ?? "Sconosciuto"}',
+              style: Theme.of(context).textTheme.bodyLarge,
+            ),
+            const SizedBox(height: 12),
+            Text(
+              'Dovrai riconfigurare l\'account per usare la posta.',
+              style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                color: OlderOSTheme.textSecondary,
+              ),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(),
+            child: const Text('Annulla', style: TextStyle(fontSize: 18)),
+          ),
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(backgroundColor: OlderOSTheme.danger),
+            onPressed: () async {
+              await emailService.removeAccount();
+              if (mounted) {
+                Navigator.of(context).pop();
+                setState(() {});
+                ScaffoldMessenger.of(this.context).showSnackBar(
+                  SnackBar(
+                    content: const Row(
+                      children: [
+                        Icon(Icons.delete, color: Colors.white, size: 28),
+                        SizedBox(width: 12),
+                        Text('Account email rimosso', style: TextStyle(fontSize: 18)),
+                      ],
+                    ),
+                    backgroundColor: OlderOSTheme.textSecondary,
+                    behavior: SnackBarBehavior.floating,
+                    margin: const EdgeInsets.all(16),
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                  ),
+                );
+              }
+            },
+            child: const Text('Rimuovi', style: TextStyle(fontSize: 18)),
           ),
         ],
       ),
@@ -738,6 +944,126 @@ class _WifiNetworkTileState extends State<_WifiNetworkTile> {
           ),
         ),
       ),
+    );
+  }
+}
+
+class _EmailConfigSection extends StatelessWidget {
+  final VoidCallback onConfigure;
+  final VoidCallback onRemoveAccount;
+
+  const _EmailConfigSection({
+    required this.onConfigure,
+    required this.onRemoveAccount,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final emailService = EmailService();
+    final isOAuthConfigured = emailService.isGoogleOAuthConfigured;
+    final isAccountConfigured = emailService.isConfigured;
+    final userEmail = emailService.userEmail;
+    final isGoogleAuth = emailService.isGoogleAuth;
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        // Stato OAuth
+        _ConfigRow(
+          label: 'Credenziali OAuth Google',
+          value: isOAuthConfigured ? 'Configurate' : 'Non configurate',
+          valueColor: isOAuthConfigured ? OlderOSTheme.success : OlderOSTheme.warning,
+        ),
+        const SizedBox(height: 12),
+
+        // Stato account email
+        if (isAccountConfigured && userEmail != null) ...[
+          _ConfigRow(
+            label: 'Account email',
+            value: userEmail,
+            valueColor: OlderOSTheme.success,
+          ),
+          const SizedBox(height: 8),
+          _ConfigRow(
+            label: 'Tipo accesso',
+            value: isGoogleAuth ? 'Google OAuth' : 'Password',
+            valueColor: OlderOSTheme.textSecondary,
+          ),
+        ] else ...[
+          _ConfigRow(
+            label: 'Account email',
+            value: 'Nessun account configurato',
+            valueColor: OlderOSTheme.textSecondary,
+          ),
+          if (isOAuthConfigured)
+            Padding(
+              padding: const EdgeInsets.only(top: 8),
+              child: Text(
+                'Vai su LEGGI per configurare il tuo account Gmail.',
+                style: TextStyle(
+                  fontSize: 16,
+                  fontStyle: FontStyle.italic,
+                  color: OlderOSTheme.textSecondary,
+                ),
+              ),
+            ),
+        ],
+
+        const SizedBox(height: 20),
+
+        // Pulsanti
+        Row(
+          children: [
+            _ActionButton(
+              label: 'CONFIGURA OAUTH',
+              color: OlderOSTheme.emailColor,
+              onTap: onConfigure,
+            ),
+            if (isAccountConfigured) ...[
+              const SizedBox(width: 16),
+              _ActionButton(
+                label: 'RIMUOVI ACCOUNT',
+                color: OlderOSTheme.danger,
+                onTap: onRemoveAccount,
+              ),
+            ],
+          ],
+        ),
+      ],
+    );
+  }
+}
+
+class _ConfigRow extends StatelessWidget {
+  final String label;
+  final String value;
+  final Color valueColor;
+
+  const _ConfigRow({
+    required this.label,
+    required this.value,
+    required this.valueColor,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          '$label: ',
+          style: Theme.of(context).textTheme.bodyMedium,
+        ),
+        Expanded(
+          child: Text(
+            value,
+            style: Theme.of(context).textTheme.bodyLarge?.copyWith(
+              fontWeight: FontWeight.w600,
+              color: valueColor,
+            ),
+          ),
+        ),
+      ],
     );
   }
 }

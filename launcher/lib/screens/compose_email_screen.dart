@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import '../theme/olderos_theme.dart';
 import '../widgets/top_bar.dart';
-import 'email_screen.dart';
+import '../services/email_service.dart';
 
 class Contact {
   final String name;
@@ -24,7 +24,11 @@ class _ComposeEmailScreenState extends State<ComposeEmailScreen> {
 
   Contact? _selectedContact;
   bool _showContacts = false;
+  bool _isSending = false;
 
+  final _emailService = EmailService();
+
+  // TODO: In futuro, caricare i contatti da rubrica salvata
   final List<Contact> _contacts = const [
     Contact(name: 'Maria (figlia)', email: 'maria@email.com'),
     Contact(name: 'Luca (nipote)', email: 'luca@email.com'),
@@ -44,14 +48,26 @@ class _ComposeEmailScreenState extends State<ComposeEmailScreen> {
   void _selectContact(Contact contact) {
     setState(() {
       _selectedContact = contact;
-      _toController.text = contact.name;
+      _toController.text = contact.email;
       _showContacts = false;
     });
   }
 
-  void _send() {
-    if (_selectedContact == null && _toController.text.isEmpty) {
+  Future<void> _send() async {
+    // Ottieni l'indirizzo email
+    String toEmail = _toController.text.trim();
+
+    // Se e' stato selezionato un contatto, usa la sua email
+    if (_selectedContact != null) {
+      toEmail = _selectedContact!.email;
+    }
+
+    if (toEmail.isEmpty) {
       _showError('Inserisci un destinatario');
+      return;
+    }
+    if (!toEmail.contains('@') || !toEmail.contains('.')) {
+      _showError('Inserisci un indirizzo email valido');
       return;
     }
     if (_subjectController.text.isEmpty) {
@@ -63,21 +79,24 @@ class _ComposeEmailScreenState extends State<ComposeEmailScreen> {
       return;
     }
 
-    final email = Email(
-      id: DateTime.now().millisecondsSinceEpoch.toString(),
-      senderName: _selectedContact?.name ?? _toController.text,
-      senderEmail: _selectedContact?.email ?? _toController.text,
+    setState(() => _isSending = true);
+
+    final error = await _emailService.sendEmail(
+      to: toEmail,
       subject: _subjectController.text,
-      preview: _bodyController.text.length > 50
-          ? '${_bodyController.text.substring(0, 50)}...'
-          : _bodyController.text,
       body: _bodyController.text,
-      date: DateTime.now(),
-      isRead: true,
-      isSent: true,
     );
 
-    Navigator.of(context).pop(email);
+    setState(() => _isSending = false);
+
+    if (error == null) {
+      // Successo
+      if (mounted) {
+        Navigator.of(context).pop({'sent': true});
+      }
+    } else {
+      _showError(error);
+    }
   }
 
   void _showError(String message) {
@@ -168,10 +187,40 @@ class _ComposeEmailScreenState extends State<ComposeEmailScreen> {
                         icon: Icons.close,
                         label: 'ANNULLA',
                         color: OlderOSTheme.textSecondary,
-                        onTap: _confirmDiscard,
+                        onTap: _isSending ? () {} : _confirmDiscard,
                       ),
                       const Spacer(),
-                      _SendButton(onTap: _send),
+                      _isSending
+                          ? Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 14),
+                              decoration: BoxDecoration(
+                                color: OlderOSTheme.success.withAlpha(180),
+                                borderRadius: BorderRadius.circular(12),
+                              ),
+                              child: const Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  SizedBox(
+                                    width: 24,
+                                    height: 24,
+                                    child: CircularProgressIndicator(
+                                      strokeWidth: 3,
+                                      color: Colors.white,
+                                    ),
+                                  ),
+                                  SizedBox(width: 12),
+                                  Text(
+                                    'INVIO IN CORSO...',
+                                    style: TextStyle(
+                                      fontSize: 20,
+                                      fontWeight: FontWeight.bold,
+                                      color: Colors.white,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            )
+                          : _SendButton(onTap: _send),
                     ],
                   ),
 
@@ -204,24 +253,30 @@ class _ComposeEmailScreenState extends State<ComposeEmailScreen> {
                                   child: TextField(
                                     controller: _toController,
                                     style: Theme.of(context).textTheme.titleMedium,
+                                    keyboardType: TextInputType.emailAddress,
+                                    enabled: !_isSending,
                                     decoration: InputDecoration(
-                                      hintText: 'Scegli un contatto...',
+                                      hintText: 'Scrivi email o scegli contatto...',
                                       hintStyle: Theme.of(context).textTheme.titleMedium?.copyWith(
                                         color: OlderOSTheme.textSecondary,
                                       ),
                                       border: InputBorder.none,
                                     ),
-                                    readOnly: true,
-                                    onTap: () => setState(() => _showContacts = !_showContacts),
+                                    onChanged: (value) {
+                                      // Se l'utente modifica il testo, deseleziona il contatto
+                                      if (_selectedContact != null && value != _selectedContact!.email) {
+                                        setState(() => _selectedContact = null);
+                                      }
+                                    },
                                   ),
                                 ),
                                 IconButton(
                                   icon: Icon(
-                                    _showContacts ? Icons.expand_less : Icons.expand_more,
+                                    _showContacts ? Icons.expand_less : Icons.contacts,
                                     size: 32,
                                     color: OlderOSTheme.primary,
                                   ),
-                                  onPressed: () => setState(() => _showContacts = !_showContacts),
+                                  onPressed: _isSending ? null : () => setState(() => _showContacts = !_showContacts),
                                 ),
                               ],
                             ),

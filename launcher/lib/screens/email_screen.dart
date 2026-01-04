@@ -1,46 +1,13 @@
 import 'package:flutter/material.dart';
 import '../theme/olderos_theme.dart';
 import '../widgets/top_bar.dart';
+import '../services/email_service.dart';
 import 'email_view_screen.dart';
 import 'compose_email_screen.dart';
+import 'email_setup_screen.dart';
 
-class Email {
-  final String id;
-  final String senderName;
-  final String senderEmail;
-  final String subject;
-  final String preview;
-  final String body;
-  final DateTime date;
-  final bool isRead;
-  final bool isSent;
-
-  Email({
-    required this.id,
-    required this.senderName,
-    required this.senderEmail,
-    required this.subject,
-    required this.preview,
-    required this.body,
-    required this.date,
-    this.isRead = false,
-    this.isSent = false,
-  });
-
-  Email copyWith({bool? isRead}) {
-    return Email(
-      id: id,
-      senderName: senderName,
-      senderEmail: senderEmail,
-      subject: subject,
-      preview: preview,
-      body: body,
-      date: date,
-      isRead: isRead ?? this.isRead,
-      isSent: isSent,
-    );
-  }
-}
+// Re-export per compatibilita
+typedef Email = EmailMessage;
 
 class EmailScreen extends StatefulWidget {
   const EmailScreen({super.key});
@@ -51,102 +18,133 @@ class EmailScreen extends StatefulWidget {
 
 class _EmailScreenState extends State<EmailScreen> {
   bool _showInbox = true;
+  bool _isLoading = true;
+  bool _isRefreshing = false;
+  String? _error;
 
-  final List<Email> _inbox = [
-    Email(
-      id: '1',
-      senderName: 'Maria (figlia)',
-      senderEmail: 'maria@email.com',
-      subject: 'Foto del compleanno di Luca',
-      preview: 'Ciao papa! Ti mando le foto della festa di compleanno...',
-      body: '''Ciao papa!
+  List<EmailMessage> _inbox = [];
+  List<EmailMessage> _sent = [];
 
-Ti mando le foto della festa di compleanno di Luca. E stato bellissimo, peccato che non sei potuto venire!
+  final _emailService = EmailService();
 
-La prossima volta ti vengo a prendere io cosi puoi stare con noi.
+  @override
+  void initState() {
+    super.initState();
+    _initializeEmail();
+  }
 
-Un abbraccio grande,
-Maria''',
-      date: DateTime.now().subtract(const Duration(hours: 2)),
-      isRead: false,
-    ),
-    Email(
-      id: '2',
-      senderName: 'Farmacia San Marco',
-      senderEmail: 'farmacia@sanmarco.it',
-      subject: 'Ricetta pronta per il ritiro',
-      preview: 'Gentile cliente, la informiamo che la sua ricetta...',
-      body: '''Gentile cliente,
+  Future<void> _initializeEmail() async {
+    setState(() => _isLoading = true);
 
-La informiamo che la sua ricetta medica e pronta per il ritiro.
+    // Carica credenziali salvate
+    final hasCredentials = await _emailService.loadSavedCredentials();
 
-Puo passare in farmacia negli orari di apertura:
-- Lunedi-Venerdi: 8:30-12:30 e 15:30-19:30
-- Sabato: 8:30-12:30
+    if (!hasCredentials) {
+      // Mostra setup
+      if (mounted) {
+        final configured = await Navigator.of(context).push<bool>(
+          MaterialPageRoute(
+            builder: (context) => const EmailSetupScreen(),
+          ),
+        );
 
-Cordiali saluti,
-Farmacia San Marco''',
-      date: DateTime.now().subtract(const Duration(days: 1)),
-      isRead: true,
-    ),
-    Email(
-      id: '3',
-      senderName: 'Luca (nipote)',
-      senderEmail: 'luca@email.com',
-      subject: 'Grazie per il regalo nonno!',
-      preview: 'Ciao nonno! Grazie mille per il regalo di compleanno...',
-      body: '''Ciao nonno!
+        if (configured != true) {
+          // L'utente ha annullato, torna alla home
+          if (mounted) {
+            Navigator.of(context).pop();
+          }
+          return;
+        }
+      }
+    }
 
-Grazie mille per il regalo di compleanno! Mi e piaciuto tantissimo!
+    await _loadEmails();
+  }
 
-Quando vieni a trovarci? Mi manchi!
+  Future<void> _loadEmails() async {
+    setState(() {
+      _isLoading = true;
+      _error = null;
+    });
 
-Un bacio grande,
-Luca''',
-      date: DateTime.now().subtract(const Duration(days: 2)),
-      isRead: true,
-    ),
-    Email(
-      id: '4',
-      senderName: 'Comune di Milano',
-      senderEmail: 'info@comune.milano.it',
-      subject: 'Avviso scadenza carta identita',
-      preview: 'Gentile cittadino, la sua carta di identita scadra...',
-      body: '''Gentile cittadino,
+    try {
+      final inbox = await _emailService.fetchInbox();
+      final sent = await _emailService.fetchSent();
 
-La sua carta di identita scadra tra 90 giorni.
+      if (mounted) {
+        setState(() {
+          _inbox = inbox;
+          _sent = sent;
+          _isLoading = false;
+        });
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() {
+          _error = e.toString().replaceAll('Exception: ', '');
+          _isLoading = false;
+        });
+      }
+    }
+  }
 
-Per rinnovarla, puo prenotare un appuntamento presso l'anagrafe del suo municipio.
+  Future<void> _refreshEmails() async {
+    if (_isRefreshing) return;
 
-Cordiali saluti,
-Comune di Milano''',
-      date: DateTime.now().subtract(const Duration(days: 5)),
-      isRead: false,
-    ),
-  ];
+    setState(() => _isRefreshing = true);
 
-  final List<Email> _sent = [
-    Email(
-      id: 's1',
-      senderName: 'Tu',
-      senderEmail: 'mario@email.com',
-      subject: 'Re: Foto del compleanno di Luca',
-      preview: 'Grazie Maria! Che belle foto...',
-      body: '''Grazie Maria! Che belle foto!
+    try {
+      final inbox = await _emailService.fetchInbox();
+      final sent = await _emailService.fetchSent();
 
-Luca e cresciuto tantissimo. La prossima volta vengo sicuramente!
+      if (mounted) {
+        setState(() {
+          _inbox = inbox;
+          _sent = sent;
+          _error = null;
+        });
+      }
+    } catch (e) {
+      if (mounted) {
+        _showError('Errore nell\'aggiornamento');
+      }
+    } finally {
+      if (mounted) {
+        setState(() => _isRefreshing = false);
+      }
+    }
+  }
 
-Baci,
-Papa''',
-      date: DateTime.now().subtract(const Duration(hours: 1)),
-      isRead: true,
-      isSent: true,
-    ),
-  ];
+  void _showError(String message) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Row(
+          children: [
+            const Icon(Icons.error_outline, color: Colors.white, size: 28),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Text(
+                message,
+                style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                  color: Colors.white,
+                ),
+              ),
+            ),
+          ],
+        ),
+        backgroundColor: OlderOSTheme.danger,
+        duration: const Duration(seconds: 3),
+        behavior: SnackBarBehavior.floating,
+        margin: const EdgeInsets.all(16),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+      ),
+    );
+  }
 
-  void _openEmail(Email email) async {
+  void _openEmail(EmailMessage email) async {
     // Segna come letto
     if (!email.isRead && !email.isSent) {
+      await _emailService.markAsRead(email);
       setState(() {
         final index = _inbox.indexWhere((e) => e.id == email.id);
         if (index != -1) {
@@ -154,6 +152,8 @@ Papa''',
         }
       });
     }
+
+    if (!mounted) return;
 
     final deleted = await Navigator.of(context).push<bool>(
       MaterialPageRoute(
@@ -166,7 +166,9 @@ Papa''',
     }
   }
 
-  void _deleteEmail(Email email) {
+  Future<void> _deleteEmail(EmailMessage email) async {
+    await _emailService.deleteEmail(email);
+
     setState(() {
       if (email.isSent) {
         _sent.removeWhere((e) => e.id == email.id);
@@ -175,62 +177,65 @@ Papa''',
       }
     });
 
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Row(
-          children: [
-            const Icon(Icons.delete, color: Colors.white, size: 28),
-            const SizedBox(width: 12),
-            Text(
-              'Messaggio eliminato',
-              style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                color: Colors.white,
-              ),
-            ),
-          ],
-        ),
-        backgroundColor: OlderOSTheme.textSecondary,
-        duration: const Duration(seconds: 2),
-        behavior: SnackBarBehavior.floating,
-        margin: const EdgeInsets.all(16),
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-      ),
-    );
-  }
-
-  void _composeEmail() async {
-    final newEmail = await Navigator.of(context).push<Email>(
-      MaterialPageRoute(
-        builder: (context) => const ComposeEmailScreen(),
-      ),
-    );
-
-    if (newEmail != null) {
-      setState(() {
-        _sent.insert(0, newEmail);
-      });
-
+    if (mounted) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Row(
             children: [
-              const Icon(Icons.check_circle, color: Colors.white, size: 28),
+              const Icon(Icons.delete, color: Colors.white, size: 28),
               const SizedBox(width: 12),
               Text(
-                'Messaggio inviato!',
+                'Messaggio eliminato',
                 style: Theme.of(context).textTheme.titleMedium?.copyWith(
                   color: Colors.white,
                 ),
               ),
             ],
           ),
-          backgroundColor: OlderOSTheme.success,
+          backgroundColor: OlderOSTheme.textSecondary,
           duration: const Duration(seconds: 2),
           behavior: SnackBarBehavior.floating,
           margin: const EdgeInsets.all(16),
           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
         ),
       );
+    }
+  }
+
+  void _composeEmail() async {
+    final result = await Navigator.of(context).push<Map<String, dynamic>>(
+      MaterialPageRoute(
+        builder: (context) => const ComposeEmailScreen(),
+      ),
+    );
+
+    if (result != null && result['sent'] == true) {
+      // Aggiorna la lista
+      await _refreshEmails();
+
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Row(
+              children: [
+                const Icon(Icons.check_circle, color: Colors.white, size: 28),
+                const SizedBox(width: 12),
+                Text(
+                  'Messaggio inviato!',
+                  style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                    color: Colors.white,
+                  ),
+                ),
+              ],
+            ),
+            backgroundColor: OlderOSTheme.success,
+            duration: const Duration(seconds: 2),
+            behavior: SnackBarBehavior.floating,
+            margin: const EdgeInsets.all(16),
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+          ),
+        );
+      }
     }
   }
 
@@ -246,61 +251,127 @@ Papa''',
             title: 'POSTA',
             onGoHome: () => Navigator.of(context).pop(),
           ),
-          Expanded(
-            child: Padding(
-              padding: const EdgeInsets.all(OlderOSTheme.marginScreen),
-              child: Column(
-                children: [
-                  // Pulsante nuovo messaggio
-                  _ComposeButton(onTap: _composeEmail),
 
-                  const SizedBox(height: 24),
-
-                  // Tab Ricevuti / Inviati
-                  Row(
-                    children: [
-                      Expanded(
-                        child: _TabButton(
-                          label: 'Ricevuti',
-                          icon: Icons.inbox,
-                          badge: unreadCount > 0 ? unreadCount : null,
-                          isActive: _showInbox,
-                          onTap: () => setState(() => _showInbox = true),
-                        ),
+          if (_isLoading)
+            const Expanded(
+              child: Center(
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    CircularProgressIndicator(
+                      color: OlderOSTheme.primary,
+                      strokeWidth: 4,
+                    ),
+                    SizedBox(height: 24),
+                    Text(
+                      'Caricamento messaggi...',
+                      style: TextStyle(
+                        fontSize: 22,
+                        color: OlderOSTheme.textSecondary,
                       ),
-                      const SizedBox(width: 16),
-                      Expanded(
-                        child: _TabButton(
-                          label: 'Inviati',
-                          icon: Icons.send,
-                          isActive: !_showInbox,
-                          onTap: () => setState(() => _showInbox = false),
+                    ),
+                  ],
+                ),
+              ),
+            )
+          else if (_error != null)
+            Expanded(
+              child: Center(
+                child: Padding(
+                  padding: const EdgeInsets.all(OlderOSTheme.marginScreen),
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      const Icon(
+                        Icons.cloud_off,
+                        size: 80,
+                        color: OlderOSTheme.textSecondary,
+                      ),
+                      const SizedBox(height: 24),
+                      Text(
+                        'Problema di connessione',
+                        style: Theme.of(context).textTheme.headlineSmall,
+                      ),
+                      const SizedBox(height: 12),
+                      Text(
+                        _error!,
+                        style: Theme.of(context).textTheme.bodyLarge?.copyWith(
+                          color: OlderOSTheme.textSecondary,
                         ),
+                        textAlign: TextAlign.center,
+                      ),
+                      const SizedBox(height: 32),
+                      _ActionButton(
+                        label: 'RIPROVA',
+                        icon: Icons.refresh,
+                        onTap: _loadEmails,
                       ),
                     ],
                   ),
+                ),
+              ),
+            )
+          else
+            Expanded(
+              child: Padding(
+                padding: const EdgeInsets.all(OlderOSTheme.marginScreen),
+                child: Column(
+                  children: [
+                    // Pulsante nuovo messaggio
+                    _ComposeButton(onTap: _composeEmail),
 
-                  const SizedBox(height: 24),
+                    const SizedBox(height: 24),
 
-                  // Lista email
-                  Expanded(
-                    child: emails.isEmpty
-                        ? _EmptyState(isSent: !_showInbox)
-                        : ListView.separated(
-                            itemCount: emails.length,
-                            separatorBuilder: (_, __) => const SizedBox(height: 12),
-                            itemBuilder: (context, index) {
-                              return _EmailCard(
-                                email: emails[index],
-                                onTap: () => _openEmail(emails[index]),
-                              );
-                            },
+                    // Tab Ricevuti / Inviati + Aggiorna
+                    Row(
+                      children: [
+                        Expanded(
+                          child: _TabButton(
+                            label: 'Ricevuti',
+                            icon: Icons.inbox,
+                            badge: unreadCount > 0 ? unreadCount : null,
+                            isActive: _showInbox,
+                            onTap: () => setState(() => _showInbox = true),
                           ),
-                  ),
-                ],
+                        ),
+                        const SizedBox(width: 16),
+                        Expanded(
+                          child: _TabButton(
+                            label: 'Inviati',
+                            icon: Icons.send,
+                            isActive: !_showInbox,
+                            onTap: () => setState(() => _showInbox = false),
+                          ),
+                        ),
+                        const SizedBox(width: 16),
+                        _RefreshButton(
+                          isRefreshing: _isRefreshing,
+                          onTap: _refreshEmails,
+                        ),
+                      ],
+                    ),
+
+                    const SizedBox(height: 24),
+
+                    // Lista email
+                    Expanded(
+                      child: emails.isEmpty
+                          ? _EmptyState(isSent: !_showInbox)
+                          : ListView.separated(
+                              itemCount: emails.length,
+                              separatorBuilder: (_, __) => const SizedBox(height: 12),
+                              itemBuilder: (context, index) {
+                                return _EmailCard(
+                                  email: emails[index],
+                                  onTap: () => _openEmail(emails[index]),
+                                );
+                              },
+                            ),
+                    ),
+                  ],
+                ),
               ),
             ),
-          ),
         ],
       ),
     );
@@ -339,12 +410,12 @@ class _ComposeButtonState extends State<_ComposeButton> {
           padding: const EdgeInsets.symmetric(vertical: 20),
           decoration: BoxDecoration(
             color: _isHovered
-                ? OlderOSTheme.primary.withOpacity(0.9)
+                ? OlderOSTheme.primary.withAlpha(230)
                 : OlderOSTheme.primary,
             borderRadius: BorderRadius.circular(OlderOSTheme.borderRadiusCard),
             boxShadow: [
               BoxShadow(
-                color: OlderOSTheme.primary.withOpacity(0.3),
+                color: OlderOSTheme.primary.withAlpha(77),
                 blurRadius: 8,
                 offset: const Offset(0, 4),
               ),
@@ -364,6 +435,110 @@ class _ComposeButtonState extends State<_ComposeButton> {
               ),
             ],
           ),
+        ),
+      ),
+    );
+  }
+}
+
+class _ActionButton extends StatefulWidget {
+  final String label;
+  final IconData icon;
+  final VoidCallback onTap;
+
+  const _ActionButton({
+    required this.label,
+    required this.icon,
+    required this.onTap,
+  });
+
+  @override
+  State<_ActionButton> createState() => _ActionButtonState();
+}
+
+class _ActionButtonState extends State<_ActionButton> {
+  bool _isHovered = false;
+
+  @override
+  Widget build(BuildContext context) {
+    return MouseRegion(
+      onEnter: (_) => setState(() => _isHovered = true),
+      onExit: (_) => setState(() => _isHovered = false),
+      child: GestureDetector(
+        onTap: widget.onTap,
+        child: Container(
+          padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 16),
+          decoration: BoxDecoration(
+            color: _isHovered ? OlderOSTheme.primary : OlderOSTheme.primary.withAlpha(230),
+            borderRadius: BorderRadius.circular(12),
+          ),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(widget.icon, color: Colors.white, size: 28),
+              const SizedBox(width: 12),
+              Text(
+                widget.label,
+                style: const TextStyle(
+                  color: Colors.white,
+                  fontSize: 20,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _RefreshButton extends StatefulWidget {
+  final bool isRefreshing;
+  final VoidCallback onTap;
+
+  const _RefreshButton({
+    required this.isRefreshing,
+    required this.onTap,
+  });
+
+  @override
+  State<_RefreshButton> createState() => _RefreshButtonState();
+}
+
+class _RefreshButtonState extends State<_RefreshButton> {
+  bool _isHovered = false;
+
+  @override
+  Widget build(BuildContext context) {
+    return MouseRegion(
+      onEnter: (_) => setState(() => _isHovered = true),
+      onExit: (_) => setState(() => _isHovered = false),
+      child: GestureDetector(
+        onTap: widget.isRefreshing ? null : widget.onTap,
+        child: Container(
+          padding: const EdgeInsets.all(16),
+          decoration: BoxDecoration(
+            color: _isHovered && !widget.isRefreshing
+                ? Colors.grey.shade200
+                : OlderOSTheme.cardBackground,
+            borderRadius: BorderRadius.circular(12),
+            border: Border.all(color: Colors.grey.shade300),
+          ),
+          child: widget.isRefreshing
+              ? const SizedBox(
+                  width: 28,
+                  height: 28,
+                  child: CircularProgressIndicator(
+                    strokeWidth: 3,
+                    color: OlderOSTheme.primary,
+                  ),
+                )
+              : Icon(
+                  Icons.refresh,
+                  size: 28,
+                  color: _isHovered ? OlderOSTheme.primary : OlderOSTheme.textSecondary,
+                ),
         ),
       ),
     );
@@ -403,7 +578,7 @@ class _TabButtonState extends State<_TabButton> {
           padding: const EdgeInsets.symmetric(vertical: 16),
           decoration: BoxDecoration(
             color: widget.isActive
-                ? OlderOSTheme.primary.withOpacity(0.1)
+                ? OlderOSTheme.primary.withAlpha(26)
                 : (_isHovered ? Colors.grey.shade100 : OlderOSTheme.cardBackground),
             borderRadius: BorderRadius.circular(12),
             border: Border.all(
@@ -472,7 +647,7 @@ class _EmptyState extends StatelessWidget {
           Icon(
             isSent ? Icons.send : Icons.inbox,
             size: 100,
-            color: OlderOSTheme.textSecondary.withOpacity(0.5),
+            color: OlderOSTheme.textSecondary.withAlpha(128),
           ),
           const SizedBox(height: 20),
           Text(
@@ -488,7 +663,7 @@ class _EmptyState extends StatelessWidget {
 }
 
 class _EmailCard extends StatefulWidget {
-  final Email email;
+  final EmailMessage email;
   final VoidCallback onTap;
 
   const _EmailCard({
@@ -534,18 +709,18 @@ class _EmailCardState extends State<_EmailCard> {
           padding: const EdgeInsets.all(20),
           decoration: BoxDecoration(
             color: isUnread
-                ? OlderOSTheme.primary.withOpacity(0.05)
+                ? OlderOSTheme.primary.withAlpha(13)
                 : OlderOSTheme.cardBackground,
             borderRadius: BorderRadius.circular(OlderOSTheme.borderRadiusCard),
             border: Border.all(
               color: _isHovered
                   ? OlderOSTheme.primary
-                  : (isUnread ? OlderOSTheme.primary.withOpacity(0.3) : Colors.transparent),
+                  : (isUnread ? OlderOSTheme.primary.withAlpha(77) : Colors.transparent),
               width: 2,
             ),
             boxShadow: [
               BoxShadow(
-                color: Colors.black.withOpacity(_isHovered ? 0.12 : 0.06),
+                color: Colors.black.withAlpha(_isHovered ? 31 : 15),
                 blurRadius: _isHovered ? 12 : 8,
                 offset: const Offset(0, 4),
               ),
@@ -642,11 +817,16 @@ class _EmailCardState extends State<_EmailCard> {
   }
 
   String _getInitials(String name) {
+    // Rimuovi "A: " per email inviate
+    if (name.startsWith('A: ')) {
+      name = name.substring(3);
+    }
+
     final parts = name.split(' ');
     if (parts.length >= 2) {
       return '${parts[0][0]}${parts[1][0]}'.toUpperCase();
     }
-    return name.substring(0, 1).toUpperCase();
+    return name.isNotEmpty ? name.substring(0, 1).toUpperCase() : '?';
   }
 
   Color _getAvatarColor(String name) {
