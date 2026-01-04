@@ -10,6 +10,9 @@ import 'writer_screen.dart';
 import 'settings_screen.dart';
 import 'email_screen.dart';
 import 'videocall_screen.dart';
+import 'calculator_screen.dart';
+import 'calendar_screen.dart';
+import 'table_screen.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -81,6 +84,30 @@ class _HomeScreenState extends State<HomeScreen> {
     Navigator.of(context).push(
       MaterialPageRoute(
         builder: (context) => const VideocallScreen(),
+      ),
+    );
+  }
+
+  void _openCalculator() {
+    Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (context) => const CalculatorScreen(),
+      ),
+    );
+  }
+
+  void _openCalendar() {
+    Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (context) => const CalendarScreen(),
+      ),
+    );
+  }
+
+  void _openTable() {
+    Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (context) => const TableScreen(),
       ),
     );
   }
@@ -256,6 +283,24 @@ class _HomeScreenState extends State<HomeScreen> {
                         icon: Icons.videocam,
                         iconColor: OlderOSTheme.videoCallColor,
                         onTap: _openVideocall,
+                      ),
+                      AppCard(
+                        label: 'CALCOLA',
+                        icon: Icons.calculate,
+                        iconColor: OlderOSTheme.calculatorColor,
+                        onTap: _openCalculator,
+                      ),
+                      AppCard(
+                        label: 'TABELLA',
+                        icon: Icons.grid_on,
+                        iconColor: OlderOSTheme.tableColor,
+                        onTap: _openTable,
+                      ),
+                      AppCard(
+                        label: 'CALENDARIO',
+                        icon: Icons.calendar_month,
+                        iconColor: OlderOSTheme.calendarColor,
+                        onTap: _openCalendar,
                       ),
                       AppCard(
                         label: 'IMPOSTAZIONI',

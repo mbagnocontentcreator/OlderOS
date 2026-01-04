@@ -18,6 +18,9 @@ class OlderOSTheme {
   static const Color photosColor = Color(0xFFF59E0B);
   static const Color videoCallColor = Color(0xFF7C3AED);
   static const Color settingsColor = Color(0xFF6B7280);
+  static const Color calculatorColor = Color(0xFF059669);   // Verde smeraldo
+  static const Color calendarColor = Color(0xFFE11D48);     // Rosa/Rosso
+  static const Color tableColor = Color(0xFF0891B2);        // Ciano/Teal
 
   // Spaziature
   static const double paddingCard = 24.0;
