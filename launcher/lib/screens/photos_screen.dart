@@ -1,18 +1,25 @@
+import 'dart:io';
 import 'package:flutter/material.dart';
+import 'package:file_picker/file_picker.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import '../theme/olderos_theme.dart';
 import '../widgets/top_bar.dart';
+import '../widgets/big_button.dart';
 import 'photo_viewer_screen.dart';
 
 class Photo {
   final String id;
-  final String url;
+  final String path; // Percorso locale del file
   final String? description;
 
   const Photo({
     required this.id,
-    required this.url,
+    required this.path,
     this.description,
   });
+
+  // Per compatibilità con photo_viewer_screen
+  String get url => path;
 }
 
 class PhotosScreen extends StatefulWidget {
@@ -23,15 +30,122 @@ class PhotosScreen extends StatefulWidget {
 }
 
 class _PhotosScreenState extends State<PhotosScreen> {
-  // Foto di esempio per l'MVP (usando picsum.photos per placeholder)
-  final List<Photo> _photos = List.generate(
-    12,
-    (index) => Photo(
-      id: 'photo_$index',
-      url: 'https://picsum.photos/seed/${index + 1}/800/600',
-      description: 'Foto ${index + 1}',
-    ),
-  );
+  List<Photo> _photos = [];
+  bool _isLoading = false;
+  String? _currentFolder;
+  String? _currentFolderPath;
+
+  // Estensioni immagini supportate
+  static const _imageExtensions = ['.jpg', '.jpeg', '.png', '.gif', '.webp', '.bmp'];
+
+  // Chiave per salvare il percorso della cartella
+  static const _folderPathKey = 'photos_folder_path';
+
+  @override
+  void initState() {
+    super.initState();
+    _loadSavedFolder();
+  }
+
+  Future<void> _loadSavedFolder() async {
+    final prefs = await SharedPreferences.getInstance();
+    final savedPath = prefs.getString(_folderPathKey);
+
+    if (savedPath != null) {
+      final directory = Directory(savedPath);
+      if (await directory.exists()) {
+        await _loadPhotosFromFolder(savedPath);
+      }
+    }
+  }
+
+  Future<void> _saveFolderPath(String path) async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString(_folderPathKey, path);
+  }
+
+  Future<void> _selectFolder() async {
+    setState(() => _isLoading = true);
+
+    try {
+      String? selectedDirectory = await FilePicker.platform.getDirectoryPath(
+        dialogTitle: 'Seleziona cartella foto',
+      );
+
+      if (selectedDirectory != null) {
+        await _loadPhotosFromFolder(selectedDirectory);
+      }
+    } catch (e) {
+      _showError('Errore nella selezione della cartella');
+    } finally {
+      setState(() => _isLoading = false);
+    }
+  }
+
+  Future<void> _loadPhotosFromFolder(String folderPath) async {
+    final directory = Directory(folderPath);
+
+    if (!await directory.exists()) {
+      _showError('La cartella non esiste');
+      return;
+    }
+
+    final List<Photo> photos = [];
+    int photoIndex = 0;
+
+    try {
+      await for (final entity in directory.list()) {
+        if (entity is File) {
+          final extension = entity.path.toLowerCase();
+          if (_imageExtensions.any((ext) => extension.endsWith(ext))) {
+            final fileName = entity.path.split('/').last;
+            photos.add(Photo(
+              id: 'photo_$photoIndex',
+              path: entity.path,
+              description: fileName,
+            ));
+            photoIndex++;
+          }
+        }
+      }
+
+      // Ordina per nome file
+      photos.sort((a, b) => a.path.compareTo(b.path));
+
+      setState(() {
+        _photos = photos;
+        _currentFolder = folderPath.split('/').last;
+        _currentFolderPath = folderPath;
+      });
+
+      // Salva il percorso per persistenza
+      await _saveFolderPath(folderPath);
+
+      if (photos.isEmpty) {
+        _showMessage('Nessuna foto trovata nella cartella');
+      }
+    } catch (e) {
+      _showError('Errore nel caricamento delle foto');
+    }
+  }
+
+  void _showError(String message) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(message, style: const TextStyle(fontSize: 18)),
+        backgroundColor: OlderOSTheme.danger,
+      ),
+    );
+  }
+
+  void _showMessage(String message) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(message, style: const TextStyle(fontSize: 18)),
+        backgroundColor: OlderOSTheme.primary,
+      ),
+    );
+  }
 
   void _openPhotoViewer(int initialIndex) {
     Navigator.of(context).push(
@@ -53,27 +167,96 @@ class _PhotosScreenState extends State<PhotosScreen> {
             title: 'FOTO',
             onGoHome: () => Navigator.of(context).pop(),
           ),
-          Expanded(
-            child: _photos.isEmpty
-                ? _EmptyState()
-                : Padding(
-                    padding: const EdgeInsets.all(OlderOSTheme.marginScreen),
-                    child: GridView.builder(
-                      gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-                        crossAxisCount: 4,
-                        crossAxisSpacing: 16,
-                        mainAxisSpacing: 16,
-                        childAspectRatio: 1,
+
+          // Barra azioni
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: OlderOSTheme.marginScreen, vertical: 16),
+            child: Row(
+              children: [
+                BigButton(
+                  label: 'SCEGLI CARTELLA',
+                  icon: Icons.folder_open,
+                  backgroundColor: _isLoading ? OlderOSTheme.textSecondary : OlderOSTheme.primary,
+                  onTap: _isLoading ? () {} : _selectFolder,
+                ),
+                const SizedBox(width: 24),
+                if (_currentFolder != null)
+                  Expanded(
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                      decoration: BoxDecoration(
+                        color: OlderOSTheme.cardBackground,
+                        borderRadius: BorderRadius.circular(12),
+                        border: Border.all(color: OlderOSTheme.primary.withAlpha(100)),
                       ),
-                      itemCount: _photos.length,
-                      itemBuilder: (context, index) {
-                        return _PhotoThumbnail(
-                          photo: _photos[index],
-                          onTap: () => _openPhotoViewer(index),
-                        );
-                      },
+                      child: Row(
+                        children: [
+                          const Icon(Icons.folder, color: OlderOSTheme.photosColor, size: 28),
+                          const SizedBox(width: 12),
+                          Expanded(
+                            child: Text(
+                              _currentFolder!,
+                              style: Theme.of(context).textTheme.titleMedium,
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                          ),
+                          const SizedBox(width: 12),
+                          Text(
+                            '${_photos.length} foto',
+                            style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                              color: OlderOSTheme.textSecondary,
+                            ),
+                          ),
+                        ],
+                      ),
                     ),
                   ),
+              ],
+            ),
+          ),
+
+          // Griglia foto o stato vuoto
+          Expanded(
+            child: _isLoading
+                ? const Center(
+                    child: Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        CircularProgressIndicator(
+                          color: OlderOSTheme.primary,
+                          strokeWidth: 4,
+                        ),
+                        SizedBox(height: 24),
+                        Text(
+                          'Caricamento foto...',
+                          style: TextStyle(
+                            fontSize: 24,
+                            color: OlderOSTheme.textSecondary,
+                          ),
+                        ),
+                      ],
+                    ),
+                  )
+                : _photos.isEmpty
+                    ? _EmptyState(onSelectFolder: _selectFolder)
+                    : Padding(
+                        padding: const EdgeInsets.all(OlderOSTheme.marginScreen),
+                        child: GridView.builder(
+                          gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+                            crossAxisCount: 4,
+                            crossAxisSpacing: 16,
+                            mainAxisSpacing: 16,
+                            childAspectRatio: 1,
+                          ),
+                          itemCount: _photos.length,
+                          itemBuilder: (context, index) {
+                            return _PhotoThumbnail(
+                              photo: _photos[index],
+                              onTap: () => _openPhotoViewer(index),
+                            );
+                          },
+                        ),
+                      ),
           ),
         ],
       ),
@@ -82,6 +265,10 @@ class _PhotosScreenState extends State<PhotosScreen> {
 }
 
 class _EmptyState extends StatelessWidget {
+  final VoidCallback onSelectFolder;
+
+  const _EmptyState({required this.onSelectFolder});
+
   @override
   Widget build(BuildContext context) {
     return Center(
@@ -91,7 +278,7 @@ class _EmptyState extends StatelessWidget {
           Icon(
             Icons.photo_library_outlined,
             size: 120,
-            color: OlderOSTheme.textSecondary.withOpacity(0.5),
+            color: OlderOSTheme.textSecondary.withAlpha(128),
           ),
           const SizedBox(height: 24),
           Text(
@@ -102,10 +289,17 @@ class _EmptyState extends StatelessWidget {
           ),
           const SizedBox(height: 12),
           Text(
-            'Le foto ricevute via email appariranno qui',
+            'Seleziona una cartella per visualizzare le tue foto',
             style: Theme.of(context).textTheme.bodyLarge?.copyWith(
               color: OlderOSTheme.textSecondary,
             ),
+          ),
+          const SizedBox(height: 32),
+          BigButton(
+            label: 'SCEGLI CARTELLA',
+            icon: Icons.folder_open,
+            backgroundColor: OlderOSTheme.photosColor,
+            onTap: onSelectFolder,
           ),
         ],
       ),
@@ -129,7 +323,6 @@ class _PhotoThumbnail extends StatefulWidget {
 class _PhotoThumbnailState extends State<_PhotoThumbnail> {
   bool _isHovered = false;
   bool _isPressed = false;
-  bool _isLoading = true;
 
   @override
   Widget build(BuildContext context) {
@@ -154,7 +347,7 @@ class _PhotoThumbnailState extends State<_PhotoThumbnail> {
             ),
             boxShadow: [
               BoxShadow(
-                color: Colors.black.withOpacity(_isHovered ? 0.2 : 0.1),
+                color: Colors.black.withAlpha(_isHovered ? 51 : 25),
                 blurRadius: _isHovered ? 12 : 8,
                 offset: const Offset(0, 4),
               ),
@@ -165,28 +358,9 @@ class _PhotoThumbnailState extends State<_PhotoThumbnail> {
             child: Stack(
               fit: StackFit.expand,
               children: [
-                Image.network(
-                  widget.photo.url,
+                Image.file(
+                  File(widget.photo.path),
                   fit: BoxFit.cover,
-                  loadingBuilder: (context, child, loadingProgress) {
-                    if (loadingProgress == null) {
-                      if (_isLoading) {
-                        WidgetsBinding.instance.addPostFrameCallback((_) {
-                          if (mounted) setState(() => _isLoading = false);
-                        });
-                      }
-                      return child;
-                    }
-                    return Container(
-                      color: OlderOSTheme.background,
-                      child: const Center(
-                        child: CircularProgressIndicator(
-                          color: OlderOSTheme.primary,
-                          strokeWidth: 3,
-                        ),
-                      ),
-                    );
-                  },
                   errorBuilder: (context, error, stackTrace) {
                     return Container(
                       color: OlderOSTheme.background,
@@ -208,7 +382,7 @@ class _PhotoThumbnailState extends State<_PhotoThumbnail> {
                         end: Alignment.bottomCenter,
                         colors: [
                           Colors.transparent,
-                          Colors.black.withOpacity(0.5),
+                          Colors.black.withAlpha(128),
                         ],
                       ),
                     ),

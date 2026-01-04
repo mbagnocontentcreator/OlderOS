@@ -1,3 +1,4 @@
+import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'photos_screen.dart';
@@ -89,21 +90,9 @@ class _PhotoViewerScreenState extends State<PhotoViewerScreen> {
                   minScale: 1.0,
                   maxScale: 3.0,
                   child: Center(
-                    child: Image.network(
-                      widget.photos[index].url,
+                    child: Image.file(
+                      File(widget.photos[index].path),
                       fit: BoxFit.contain,
-                      loadingBuilder: (context, child, loadingProgress) {
-                        if (loadingProgress == null) return child;
-                        return Center(
-                          child: CircularProgressIndicator(
-                            color: Colors.white,
-                            value: loadingProgress.expectedTotalBytes != null
-                                ? loadingProgress.cumulativeBytesLoaded /
-                                    loadingProgress.expectedTotalBytes!
-                                : null,
-                          ),
-                        );
-                      },
                       errorBuilder: (context, error, stackTrace) {
                         return const Center(
                           child: Icon(
@@ -202,22 +191,38 @@ class _PhotoViewerScreenState extends State<PhotoViewerScreen> {
                     ],
                   ),
                 ),
-                child: Row(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: List.generate(
-                    widget.photos.length,
-                    (index) => Container(
-                      margin: const EdgeInsets.symmetric(horizontal: 4),
-                      width: index == _currentIndex ? 12 : 8,
-                      height: index == _currentIndex ? 12 : 8,
-                      decoration: BoxDecoration(
-                        shape: BoxShape.circle,
-                        color: index == _currentIndex
-                            ? Colors.white
-                            : Colors.white.withOpacity(0.4),
-                      ),
-                    ),
-                  ),
+                child: Center(
+                  child: widget.photos.length <= 20
+                      // Per poche foto, mostra i pallini
+                      ? SingleChildScrollView(
+                          scrollDirection: Axis.horizontal,
+                          child: Row(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: List.generate(
+                              widget.photos.length,
+                              (index) => Container(
+                                margin: const EdgeInsets.symmetric(horizontal: 4),
+                                width: index == _currentIndex ? 12 : 8,
+                                height: index == _currentIndex ? 12 : 8,
+                                decoration: BoxDecoration(
+                                  shape: BoxShape.circle,
+                                  color: index == _currentIndex
+                                      ? Colors.white
+                                      : Colors.white.withOpacity(0.4),
+                                ),
+                              ),
+                            ),
+                          ),
+                        )
+                      // Per molte foto, mostra solo il contatore
+                      : Text(
+                          '${_currentIndex + 1} / ${widget.photos.length}',
+                          style: const TextStyle(
+                            color: Colors.white,
+                            fontSize: 24,
+                            fontWeight: FontWeight.w500,
+                          ),
+                        ),
                 ),
               ),
             ),
