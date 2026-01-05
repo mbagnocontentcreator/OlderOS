@@ -1,7 +1,11 @@
+import 'dart:async';
+import 'dart:io';
 import 'package:flutter/material.dart';
+import 'package:file_picker/file_picker.dart';
 import '../theme/olderos_theme.dart';
 import '../widgets/top_bar.dart';
 import '../services/email_service.dart';
+import '../services/draft_service.dart';
 
 class Contact {
   final String name;
@@ -10,8 +14,38 @@ class Contact {
   const Contact({required this.name, required this.email});
 }
 
+/// Modalità di composizione email
+enum ComposeMode { newEmail, reply, forward }
+
 class ComposeEmailScreen extends StatefulWidget {
-  const ComposeEmailScreen({super.key});
+  final ComposeMode mode;
+  final String? replyTo;        // Email destinatario per risposta
+  final String? replyToName;    // Nome destinatario per risposta
+  final String? originalSubject;
+  final String? originalBody;
+  final String? originalSender;
+  final DateTime? originalDate;
+
+  // Parametri per bozze
+  final String? draftId;
+  final String? initialTo;
+  final String? initialSubject;
+  final String? initialBody;
+
+  const ComposeEmailScreen({
+    super.key,
+    this.mode = ComposeMode.newEmail,
+    this.replyTo,
+    this.replyToName,
+    this.originalSubject,
+    this.originalBody,
+    this.originalSender,
+    this.originalDate,
+    this.draftId,
+    this.initialTo,
+    this.initialSubject,
+    this.initialBody,
+  });
 
   @override
   State<ComposeEmailScreen> createState() => _ComposeEmailScreenState();
@@ -26,7 +60,16 @@ class _ComposeEmailScreenState extends State<ComposeEmailScreen> {
   bool _showContacts = false;
   bool _isSending = false;
 
+  // Lista allegati
+  List<File> _attachments = [];
+
   final _emailService = EmailService();
+  final _draftService = DraftService();
+
+  // Gestione bozze
+  String? _currentDraftId;
+  Timer? _autoSaveTimer;
+  bool _hasUnsavedChanges = false;
 
   // TODO: In futuro, caricare i contatti da rubrica salvata
   final List<Contact> _contacts = const [
@@ -38,11 +81,167 @@ class _ComposeEmailScreenState extends State<ComposeEmailScreen> {
   ];
 
   @override
+  void initState() {
+    super.initState();
+    _initializeForMode();
+    _initializeDraft();
+    _startAutoSave();
+  }
+
+  void _initializeDraft() {
+    // Se abbiamo un draftId, stiamo modificando una bozza esistente
+    _currentDraftId = widget.draftId;
+
+    // Inizializza con i valori della bozza se presenti
+    if (widget.initialTo != null && widget.initialTo!.isNotEmpty) {
+      _toController.text = widget.initialTo!;
+    }
+    if (widget.initialSubject != null && widget.initialSubject!.isNotEmpty) {
+      _subjectController.text = widget.initialSubject!;
+    }
+    if (widget.initialBody != null && widget.initialBody!.isNotEmpty) {
+      _bodyController.text = widget.initialBody!;
+    }
+  }
+
+  void _startAutoSave() {
+    // Salva automaticamente ogni 10 secondi se ci sono modifiche
+    _autoSaveTimer = Timer.periodic(const Duration(seconds: 10), (_) {
+      if (_hasUnsavedChanges && !_isSending) {
+        _saveDraft();
+      }
+    });
+
+    // Ascolta le modifiche ai campi
+    _toController.addListener(_markAsChanged);
+    _subjectController.addListener(_markAsChanged);
+    _bodyController.addListener(_markAsChanged);
+  }
+
+  void _markAsChanged() {
+    if (!_hasUnsavedChanges) {
+      setState(() => _hasUnsavedChanges = true);
+    }
+  }
+
+  Future<void> _saveDraft() async {
+    // Non salvare se tutti i campi sono vuoti
+    if (_toController.text.isEmpty &&
+        _subjectController.text.isEmpty &&
+        _bodyController.text.isEmpty) {
+      return;
+    }
+
+    _currentDraftId = await _draftService.saveDraft(
+      id: _currentDraftId,
+      to: _toController.text,
+      subject: _subjectController.text,
+      body: _bodyController.text,
+    );
+    _hasUnsavedChanges = false;
+  }
+
+  Future<void> _deleteDraftIfExists() async {
+    if (_currentDraftId != null) {
+      await _draftService.deleteDraft(_currentDraftId!);
+      _currentDraftId = null;
+    }
+  }
+
+  void _initializeForMode() {
+    switch (widget.mode) {
+      case ComposeMode.reply:
+        // Imposta destinatario
+        if (widget.replyTo != null) {
+          _toController.text = widget.replyTo!;
+        }
+        // Imposta oggetto con "Re:"
+        if (widget.originalSubject != null) {
+          final subject = widget.originalSubject!;
+          if (!subject.toLowerCase().startsWith('re:')) {
+            _subjectController.text = 'Re: $subject';
+          } else {
+            _subjectController.text = subject;
+          }
+        }
+        // Prepara corpo con citazione
+        if (widget.originalBody != null) {
+          final date = widget.originalDate != null
+              ? _formatQuoteDate(widget.originalDate!)
+              : '';
+          final sender = widget.originalSender ?? '';
+          _bodyController.text = '\n\n\n--- Messaggio originale ---\nDa: $sender\nData: $date\n\n${widget.originalBody}';
+        }
+        break;
+
+      case ComposeMode.forward:
+        // Imposta oggetto con "Fwd:"
+        if (widget.originalSubject != null) {
+          final subject = widget.originalSubject!;
+          if (!subject.toLowerCase().startsWith('fwd:') &&
+              !subject.toLowerCase().startsWith('i:')) {
+            _subjectController.text = 'Fwd: $subject';
+          } else {
+            _subjectController.text = subject;
+          }
+        }
+        // Prepara corpo con messaggio originale
+        if (widget.originalBody != null) {
+          final date = widget.originalDate != null
+              ? _formatQuoteDate(widget.originalDate!)
+              : '';
+          final sender = widget.originalSender ?? '';
+          _bodyController.text = '\n\n\n--- Messaggio inoltrato ---\nDa: $sender\nData: $date\n\n${widget.originalBody}';
+        }
+        break;
+
+      case ComposeMode.newEmail:
+        // Nessuna inizializzazione speciale
+        break;
+    }
+  }
+
+  String _formatQuoteDate(DateTime date) {
+    return '${date.day}/${date.month}/${date.year} ${date.hour.toString().padLeft(2, '0')}:${date.minute.toString().padLeft(2, '0')}';
+  }
+
+  @override
   void dispose() {
+    _autoSaveTimer?.cancel();
+    _toController.removeListener(_markAsChanged);
+    _subjectController.removeListener(_markAsChanged);
+    _bodyController.removeListener(_markAsChanged);
     _toController.dispose();
     _subjectController.dispose();
     _bodyController.dispose();
     super.dispose();
+  }
+
+  Future<void> _pickAttachments() async {
+    try {
+      final result = await FilePicker.platform.pickFiles(
+        allowMultiple: true,
+        type: FileType.any,
+      );
+
+      if (result != null) {
+        setState(() {
+          for (final file in result.files) {
+            if (file.path != null) {
+              _attachments.add(File(file.path!));
+            }
+          }
+        });
+      }
+    } catch (e) {
+      _showError('Errore nella selezione dei file');
+    }
+  }
+
+  void _removeAttachment(int index) {
+    setState(() {
+      _attachments.removeAt(index);
+    });
   }
 
   void _selectContact(Contact contact) {
@@ -85,12 +284,14 @@ class _ComposeEmailScreenState extends State<ComposeEmailScreen> {
       to: toEmail,
       subject: _subjectController.text,
       body: _bodyController.text,
+      attachments: _attachments.isNotEmpty ? _attachments : null,
     );
 
     setState(() => _isSending = false);
 
     if (error == null) {
-      // Successo
+      // Successo - elimina la bozza se esiste
+      await _deleteDraftIfExists();
       if (mounted) {
         Navigator.of(context).pop({'sent': true});
       }
@@ -118,9 +319,11 @@ class _ComposeEmailScreenState extends State<ComposeEmailScreen> {
   }
 
   void _confirmDiscard() {
-    if (_toController.text.isEmpty &&
-        _subjectController.text.isEmpty &&
-        _bodyController.text.isEmpty) {
+    final hasContent = _toController.text.isNotEmpty ||
+        _subjectController.text.isNotEmpty ||
+        _bodyController.text.isNotEmpty;
+
+    if (!hasContent) {
       Navigator.of(context).pop();
       return;
     }
@@ -132,12 +335,12 @@ class _ComposeEmailScreenState extends State<ComposeEmailScreen> {
           borderRadius: BorderRadius.circular(OlderOSTheme.borderRadiusCard),
         ),
         title: Text(
-          'Annullare il messaggio?',
+          'Cosa vuoi fare?',
           style: Theme.of(context).textTheme.displayMedium,
           textAlign: TextAlign.center,
         ),
         content: Text(
-          'Il messaggio non sara salvato.',
+          'Puoi salvare il messaggio come bozza per continuare dopo.',
           style: Theme.of(context).textTheme.bodyLarge,
           textAlign: TextAlign.center,
         ),
@@ -150,20 +353,46 @@ class _ComposeEmailScreenState extends State<ComposeEmailScreen> {
               style: TextStyle(fontSize: 18, color: OlderOSTheme.primary),
             ),
           ),
-          const SizedBox(width: 16),
+          const SizedBox(width: 8),
           ElevatedButton(
-            onPressed: () {
+            onPressed: () async {
+              await _saveDraft();
+              if (!context.mounted) return;
+              Navigator.of(ctx).pop();
+              Navigator.of(context).pop({'saved': true});
+            },
+            style: ElevatedButton.styleFrom(
+              backgroundColor: OlderOSTheme.warning,
+            ),
+            child: const Text('Salva bozza', style: TextStyle(fontSize: 18)),
+          ),
+          const SizedBox(width: 8),
+          ElevatedButton(
+            onPressed: () async {
+              await _deleteDraftIfExists();
+              if (!context.mounted) return;
               Navigator.of(ctx).pop();
               Navigator.of(context).pop();
             },
             style: ElevatedButton.styleFrom(
               backgroundColor: OlderOSTheme.danger,
             ),
-            child: const Text('Annulla messaggio', style: TextStyle(fontSize: 18)),
+            child: const Text('Elimina', style: TextStyle(fontSize: 18)),
           ),
         ],
       ),
     );
+  }
+
+  String _getTitle() {
+    switch (widget.mode) {
+      case ComposeMode.reply:
+        return 'RISPONDI';
+      case ComposeMode.forward:
+        return 'INOLTRA';
+      case ComposeMode.newEmail:
+        return 'NUOVO MESSAGGIO';
+    }
   }
 
   @override
@@ -172,7 +401,7 @@ class _ComposeEmailScreenState extends State<ComposeEmailScreen> {
       body: Column(
         children: [
           TopBar(
-            title: 'NUOVO MESSAGGIO',
+            title: _getTitle(),
             onGoHome: _confirmDiscard,
           ),
           Expanded(
@@ -323,6 +552,50 @@ class _ComposeEmailScreenState extends State<ComposeEmailScreen> {
 
                           const Divider(),
 
+                          // Pulsante allegati
+                          Padding(
+                            padding: const EdgeInsets.symmetric(vertical: 8),
+                            child: Row(
+                              children: [
+                                _AttachButton(
+                                  onTap: _isSending ? () {} : _pickAttachments,
+                                ),
+                                const SizedBox(width: 16),
+                                if (_attachments.isNotEmpty)
+                                  Text(
+                                    '${_attachments.length} allegat${_attachments.length == 1 ? 'o' : 'i'}',
+                                    style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                                      color: OlderOSTheme.success,
+                                      fontWeight: FontWeight.w600,
+                                    ),
+                                  ),
+                              ],
+                            ),
+                          ),
+
+                          // Lista allegati
+                          if (_attachments.isNotEmpty)
+                            Container(
+                              margin: const EdgeInsets.only(bottom: 12),
+                              padding: const EdgeInsets.all(12),
+                              decoration: BoxDecoration(
+                                color: OlderOSTheme.background,
+                                borderRadius: BorderRadius.circular(12),
+                              ),
+                              child: Column(
+                                children: _attachments.asMap().entries.map((entry) {
+                                  final index = entry.key;
+                                  final file = entry.value;
+                                  return _AttachmentTile(
+                                    fileName: file.path.split('/').last,
+                                    onRemove: _isSending ? null : () => _removeAttachment(index),
+                                  );
+                                }).toList(),
+                              ),
+                            ),
+
+                          const Divider(),
+
                           // Corpo messaggio
                           Expanded(
                             child: TextField(
@@ -348,6 +621,89 @@ class _ComposeEmailScreenState extends State<ComposeEmailScreen> {
               ),
             ),
           ),
+        ],
+      ),
+    );
+  }
+}
+
+class _AttachButton extends StatefulWidget {
+  final VoidCallback onTap;
+
+  const _AttachButton({required this.onTap});
+
+  @override
+  State<_AttachButton> createState() => _AttachButtonState();
+}
+
+class _AttachButtonState extends State<_AttachButton> {
+  bool _isHovered = false;
+
+  @override
+  Widget build(BuildContext context) {
+    return MouseRegion(
+      onEnter: (_) => setState(() => _isHovered = true),
+      onExit: (_) => setState(() => _isHovered = false),
+      child: GestureDetector(
+        onTap: widget.onTap,
+        child: Container(
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+          decoration: BoxDecoration(
+            color: _isHovered ? OlderOSTheme.primary.withAlpha(26) : Colors.transparent,
+            borderRadius: BorderRadius.circular(8),
+            border: Border.all(color: OlderOSTheme.primary, width: 2),
+          ),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(Icons.attach_file, size: 24, color: OlderOSTheme.primary),
+              const SizedBox(width: 8),
+              Text(
+                'ALLEGA FILE',
+                style: TextStyle(
+                  fontSize: 16,
+                  fontWeight: FontWeight.w600,
+                  color: OlderOSTheme.primary,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _AttachmentTile extends StatelessWidget {
+  final String fileName;
+  final VoidCallback? onRemove;
+
+  const _AttachmentTile({
+    required this.fileName,
+    this.onRemove,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 4),
+      child: Row(
+        children: [
+          Icon(Icons.insert_drive_file, size: 24, color: OlderOSTheme.primary),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Text(
+              fileName,
+              style: Theme.of(context).textTheme.bodyMedium,
+              overflow: TextOverflow.ellipsis,
+            ),
+          ),
+          if (onRemove != null)
+            IconButton(
+              icon: const Icon(Icons.close, color: OlderOSTheme.danger),
+              onPressed: onRemove,
+              tooltip: 'Rimuovi',
+            ),
         ],
       ),
     );

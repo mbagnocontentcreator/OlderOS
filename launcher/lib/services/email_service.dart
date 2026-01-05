@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:io';
 import 'package:enough_mail/enough_mail.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'google_auth_service.dart';
@@ -32,6 +33,27 @@ class EmailCredentials {
   });
 }
 
+/// Modello per allegato email
+class EmailAttachment {
+  final String fileName;
+  final String mimeType;
+  final int size;
+  final List<int>? data;
+
+  const EmailAttachment({
+    required this.fileName,
+    required this.mimeType,
+    required this.size,
+    this.data,
+  });
+
+  String get sizeFormatted {
+    if (size < 1024) return '$size B';
+    if (size < 1024 * 1024) return '${(size / 1024).toStringAsFixed(1)} KB';
+    return '${(size / (1024 * 1024)).toStringAsFixed(1)} MB';
+  }
+}
+
 /// Modello email semplificato per OlderOS
 class EmailMessage {
   final String id;
@@ -44,6 +66,7 @@ class EmailMessage {
   final bool isRead;
   final bool isSent;
   final int? uid;
+  final List<EmailAttachment> attachments;
 
   const EmailMessage({
     required this.id,
@@ -56,7 +79,10 @@ class EmailMessage {
     this.isRead = false,
     this.isSent = false,
     this.uid,
+    this.attachments = const [],
   });
+
+  bool get hasAttachments => attachments.isNotEmpty;
 
   EmailMessage copyWith({bool? isRead}) {
     return EmailMessage(
@@ -70,6 +96,7 @@ class EmailMessage {
       isRead: isRead ?? this.isRead,
       isSent: isSent,
       uid: uid,
+      attachments: attachments,
     );
   }
 }
@@ -107,6 +134,10 @@ class EmailService {
 
   /// Carica credenziali salvate
   Future<bool> loadSavedCredentials() async {
+    // Carica SEMPRE le credenziali OAuth (Client ID/Secret) se presenti
+    // Così saranno disponibili per "Accedi con Google" anche senza account
+    await _googleAuth.loadSavedCredentials();
+
     final prefs = await SharedPreferences.getInstance();
     final email = prefs.getString(_keyEmail);
     final displayName = prefs.getString(_keyDisplayName);
@@ -304,7 +335,17 @@ class EmailService {
             authentication: Authentication.oauth2,
             usernameType: UsernameType.emailAddress,
           ),
-          authentication: PlainAuthentication(_credentials!.email, accessToken),
+          authentication: OauthAuthentication(
+            _credentials!.email,
+            OauthToken(
+              accessToken: accessToken,
+              expiresIn: 3600,
+              refreshToken: '',
+              scope: 'https://mail.google.com/',
+              tokenType: 'Bearer',
+              created: DateTime.now(),
+            ),
+          ),
         ),
         outgoing: MailServerConfig(
           serverConfig: ServerConfig(
@@ -315,7 +356,17 @@ class EmailService {
             authentication: Authentication.oauth2,
             usernameType: UsernameType.emailAddress,
           ),
-          authentication: PlainAuthentication(_credentials!.email, accessToken),
+          authentication: OauthAuthentication(
+            _credentials!.email,
+            OauthToken(
+              accessToken: accessToken,
+              expiresIn: 3600,
+              refreshToken: '',
+              scope: 'https://mail.google.com/',
+              tokenType: 'Bearer',
+              created: DateTime.now(),
+            ),
+          ),
         ),
       );
 
@@ -385,6 +436,7 @@ class EmailService {
 
         String body = '';
         String preview = '';
+        List<EmailAttachment> attachments = [];
 
         try {
           final fullMsg = await _mailClient!.fetchMessageContents(msg);
@@ -393,6 +445,9 @@ class EmailService {
             body = _cleanHtml(fullMsg.decodeTextHtmlPart() ?? '');
           }
           preview = body.length > 100 ? '${body.substring(0, 100)}...' : body;
+
+          // Estrai allegati
+          attachments = _extractAttachments(fullMsg);
         } catch (_) {
           preview = '(Contenuto non disponibile)';
         }
@@ -410,8 +465,12 @@ class EmailService {
           isRead: isRead,
           isSent: false,
           uid: msg.uid,
+          attachments: attachments,
         ));
       }
+
+      // Ordina dalla più recente alla più vecchia
+      emails.sort((a, b) => b.date.compareTo(a.date));
 
       return emails;
     } catch (e) {
@@ -430,13 +489,26 @@ class EmailService {
       final mailboxes = await _mailClient!.listMailboxes();
 
       Mailbox? sentBox;
+
+      // Prima cerca per flag MailboxFlag.sent
       for (final box in mailboxes) {
-        final name = box.name.toLowerCase();
-        if (name == 'sent' || name == 'sent messages' || name == 'sent mail' ||
-            name == 'inviati' || name.contains('sent') ||
-            name == '[gmail]/sent mail' || name == '[gmail]/posta inviata') {
+        if (box.flags.contains(MailboxFlag.sent)) {
           sentBox = box;
           break;
+        }
+      }
+
+      // Se non trovato per flag, cerca per nome
+      if (sentBox == null) {
+        for (final box in mailboxes) {
+          final name = box.name.toLowerCase();
+          final path = box.path.toLowerCase();
+          if (name == 'sent' || name == 'sent messages' || name == 'sent mail' ||
+              name == 'inviati' || name == 'posta inviata' || path.contains('sent') ||
+              path.contains('posta inviata')) {
+            sentBox = box;
+            break;
+          }
         }
       }
 
@@ -482,6 +554,9 @@ class EmailService {
         ));
       }
 
+      // Ordina dalla più recente alla più vecchia
+      emails.sort((a, b) => b.date.compareTo(a.date));
+
       return emails;
     } catch (e) {
       return [];
@@ -522,6 +597,7 @@ class EmailService {
     required String to,
     required String subject,
     required String body,
+    List<File>? attachments,
   }) async {
     if (_credentials == null && _mailAccount == null) {
       return 'Account non configurato';
@@ -530,7 +606,13 @@ class EmailService {
     try {
       await ensureConnected();
 
-      final builder = MessageBuilder.prepareMultipartAlternativeMessage();
+      final hasAttachments = attachments != null && attachments.isNotEmpty;
+
+      // Usa builder diverso se ci sono allegati
+      final builder = hasAttachments
+          ? MessageBuilder.prepareMultipartMixedMessage()
+          : MessageBuilder.prepareMultipartAlternativeMessage();
+
       builder.from = [MailAddress(
         _credentials?.displayName ?? '',
         _credentials?.email ?? _mailAccount!.email,
@@ -539,9 +621,61 @@ class EmailService {
       builder.subject = subject;
       builder.addTextPlain(body);
 
+      // Aggiungi allegati se presenti
+      if (hasAttachments) {
+        for (final file in attachments!) {
+          final bytes = await file.readAsBytes();
+          final fileName = file.path.split('/').last;
+          final mimeType = _getMimeType(fileName);
+          builder.addBinary(
+            bytes,
+            MediaType.fromText(mimeType),
+            filename: fileName,
+            disposition: ContentDispositionHeader.from(
+              ContentDisposition.attachment,
+              filename: fileName,
+            ),
+          );
+        }
+      }
+
       final message = builder.buildMimeMessage();
 
       await _mailClient!.sendMessage(message);
+
+      // Salva nella cartella Sent
+      try {
+        final mailboxes = await _mailClient!.listMailboxes();
+        Mailbox? sentBox;
+
+        // Prima cerca per flag MailboxFlag.sent
+        for (final box in mailboxes) {
+          if (box.flags.contains(MailboxFlag.sent)) {
+            sentBox = box;
+            break;
+          }
+        }
+
+        // Se non trovato per flag, cerca per nome
+        if (sentBox == null) {
+          for (final box in mailboxes) {
+            final name = box.name.toLowerCase();
+            final path = box.path.toLowerCase();
+            if (name == 'sent' || name == 'sent messages' || name == 'sent mail' ||
+                name == 'inviati' || path.contains('sent') ||
+                path == '[gmail]/sent mail' || path == '[gmail]/posta inviata') {
+              sentBox = box;
+              break;
+            }
+          }
+        }
+
+        if (sentBox != null) {
+          await _mailClient!.appendMessage(message, sentBox, flags: [MessageFlags.seen]);
+        }
+      } catch (_) {
+        // Ignora errori nel salvataggio - la mail è stata comunque inviata
+      }
 
       return null;
     } catch (e) {
@@ -616,5 +750,96 @@ class EmailService {
     text = text.replaceAll('&quot;', '"');
     text = text.replaceAll(RegExp(r'\n{3,}'), '\n\n');
     return text.trim();
+  }
+
+  String _getMimeType(String fileName) {
+    final ext = fileName.split('.').last.toLowerCase();
+    switch (ext) {
+      // Immagini
+      case 'jpg':
+      case 'jpeg':
+        return 'image/jpeg';
+      case 'png':
+        return 'image/png';
+      case 'gif':
+        return 'image/gif';
+      case 'webp':
+        return 'image/webp';
+      // Documenti
+      case 'pdf':
+        return 'application/pdf';
+      case 'doc':
+        return 'application/msword';
+      case 'docx':
+        return 'application/vnd.openxmlformats-officedocument.wordprocessingml.document';
+      case 'xls':
+        return 'application/vnd.ms-excel';
+      case 'xlsx':
+        return 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet';
+      case 'txt':
+        return 'text/plain';
+      // Video
+      case 'mp4':
+        return 'video/mp4';
+      case 'mov':
+        return 'video/quicktime';
+      // Audio
+      case 'mp3':
+        return 'audio/mpeg';
+      // Archivi
+      case 'zip':
+        return 'application/zip';
+      default:
+        return 'application/octet-stream';
+    }
+  }
+
+  List<EmailAttachment> _extractAttachments(MimeMessage msg) {
+    final attachments = <EmailAttachment>[];
+
+    void processpart(MimePart part) {
+      final contentDisposition = part.getHeaderContentDisposition();
+      final contentType = part.getHeaderContentType();
+
+      // Verifica se è un allegato
+      final isAttachment = contentDisposition?.disposition == ContentDisposition.attachment ||
+          (contentDisposition?.filename != null && contentDisposition!.filename!.isNotEmpty);
+
+      if (isAttachment) {
+        final fileName = contentDisposition?.filename ??
+            contentType?.parameters?['name'] ??
+            'allegato';
+        final mimeType = contentType?.mediaType.text ?? 'application/octet-stream';
+
+        // Decodifica i dati
+        List<int>? data;
+        try {
+          data = part.decodeContentBinary();
+        } catch (_) {}
+
+        attachments.add(EmailAttachment(
+          fileName: fileName,
+          mimeType: mimeType,
+          size: data?.length ?? 0,
+          data: data,
+        ));
+      }
+
+      // Processa parti annidate
+      if (part.parts != null) {
+        for (final subPart in part.parts!) {
+          processpart(subPart);
+        }
+      }
+    }
+
+    // Processa tutte le parti del messaggio
+    if (msg.parts != null) {
+      for (final part in msg.parts!) {
+        processpart(part);
+      }
+    }
+
+    return attachments;
   }
 }

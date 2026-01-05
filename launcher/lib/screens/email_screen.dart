@@ -2,12 +2,16 @@ import 'package:flutter/material.dart';
 import '../theme/olderos_theme.dart';
 import '../widgets/top_bar.dart';
 import '../services/email_service.dart';
+import '../services/draft_service.dart';
 import 'email_view_screen.dart';
 import 'compose_email_screen.dart';
 import 'email_setup_screen.dart';
 
 // Re-export per compatibilita
 typedef Email = EmailMessage;
+
+/// Tab attiva nella schermata email
+enum EmailTab { inbox, sent, drafts }
 
 class EmailScreen extends StatefulWidget {
   const EmailScreen({super.key});
@@ -17,15 +21,17 @@ class EmailScreen extends StatefulWidget {
 }
 
 class _EmailScreenState extends State<EmailScreen> {
-  bool _showInbox = true;
+  EmailTab _currentTab = EmailTab.inbox;
   bool _isLoading = true;
   bool _isRefreshing = false;
   String? _error;
 
   List<EmailMessage> _inbox = [];
   List<EmailMessage> _sent = [];
+  List<EmailDraft> _drafts = [];
 
   final _emailService = EmailService();
+  final _draftService = DraftService();
 
   @override
   void initState() {
@@ -70,11 +76,13 @@ class _EmailScreenState extends State<EmailScreen> {
     try {
       final inbox = await _emailService.fetchInbox();
       final sent = await _emailService.fetchSent();
+      final drafts = await _draftService.getAllDrafts();
 
       if (mounted) {
         setState(() {
           _inbox = inbox;
           _sent = sent;
+          _drafts = drafts;
           _isLoading = false;
         });
       }
@@ -96,11 +104,13 @@ class _EmailScreenState extends State<EmailScreen> {
     try {
       final inbox = await _emailService.fetchInbox();
       final sent = await _emailService.fetchSent();
+      final drafts = await _draftService.getAllDrafts();
 
       if (mounted) {
         setState(() {
           _inbox = inbox;
           _sent = sent;
+          _drafts = drafts;
           _error = null;
         });
       }
@@ -112,6 +122,13 @@ class _EmailScreenState extends State<EmailScreen> {
       if (mounted) {
         setState(() => _isRefreshing = false);
       }
+    }
+  }
+
+  Future<void> _reloadDrafts() async {
+    final drafts = await _draftService.getAllDrafts();
+    if (mounted) {
+      setState(() => _drafts = drafts);
     }
   }
 
@@ -239,10 +256,132 @@ class _EmailScreenState extends State<EmailScreen> {
     }
   }
 
+  Widget _buildEmailList() {
+    switch (_currentTab) {
+      case EmailTab.inbox:
+        if (_inbox.isEmpty) {
+          return const _EmptyState(type: EmailTab.inbox);
+        }
+        return ListView.separated(
+          itemCount: _inbox.length,
+          separatorBuilder: (_, __) => const SizedBox(height: 12),
+          itemBuilder: (context, index) {
+            return _EmailCard(
+              email: _inbox[index],
+              onTap: () => _openEmail(_inbox[index]),
+            );
+          },
+        );
+
+      case EmailTab.sent:
+        if (_sent.isEmpty) {
+          return const _EmptyState(type: EmailTab.sent);
+        }
+        return ListView.separated(
+          itemCount: _sent.length,
+          separatorBuilder: (_, __) => const SizedBox(height: 12),
+          itemBuilder: (context, index) {
+            return _EmailCard(
+              email: _sent[index],
+              onTap: () => _openEmail(_sent[index]),
+            );
+          },
+        );
+
+      case EmailTab.drafts:
+        if (_drafts.isEmpty) {
+          return const _EmptyState(type: EmailTab.drafts);
+        }
+        return ListView.separated(
+          itemCount: _drafts.length,
+          separatorBuilder: (_, __) => const SizedBox(height: 12),
+          itemBuilder: (context, index) {
+            return _DraftCard(
+              draft: _drafts[index],
+              onTap: () => _openDraft(_drafts[index]),
+              onDelete: () => _deleteDraft(_drafts[index]),
+            );
+          },
+        );
+    }
+  }
+
+  void _openDraft(EmailDraft draft) async {
+    final result = await Navigator.of(context).push<Map<String, dynamic>>(
+      MaterialPageRoute(
+        builder: (context) => ComposeEmailScreen(
+          draftId: draft.id,
+          initialTo: draft.to,
+          initialSubject: draft.subject,
+          initialBody: draft.body,
+        ),
+      ),
+    );
+
+    // Ricarica le bozze dopo la modifica
+    await _reloadDrafts();
+
+    if (result != null && result['sent'] == true) {
+      await _refreshEmails();
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Row(
+              children: [
+                const Icon(Icons.check_circle, color: Colors.white, size: 28),
+                const SizedBox(width: 12),
+                Text(
+                  'Messaggio inviato!',
+                  style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                    color: Colors.white,
+                  ),
+                ),
+              ],
+            ),
+            backgroundColor: OlderOSTheme.success,
+            duration: const Duration(seconds: 2),
+            behavior: SnackBarBehavior.floating,
+            margin: const EdgeInsets.all(16),
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+          ),
+        );
+      }
+    }
+  }
+
+  Future<void> _deleteDraft(EmailDraft draft) async {
+    await _draftService.deleteDraft(draft.id);
+    await _reloadDrafts();
+
+    if (mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Row(
+            children: [
+              const Icon(Icons.delete, color: Colors.white, size: 28),
+              const SizedBox(width: 12),
+              Text(
+                'Bozza eliminata',
+                style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                  color: Colors.white,
+                ),
+              ),
+            ],
+          ),
+          backgroundColor: OlderOSTheme.textSecondary,
+          duration: const Duration(seconds: 2),
+          behavior: SnackBarBehavior.floating,
+          margin: const EdgeInsets.all(16),
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+        ),
+      );
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
-    final emails = _showInbox ? _inbox : _sent;
     final unreadCount = _inbox.where((e) => !e.isRead).length;
+    final draftCount = _drafts.length;
 
     return Scaffold(
       body: Column(
@@ -322,7 +461,7 @@ class _EmailScreenState extends State<EmailScreen> {
 
                     const SizedBox(height: 24),
 
-                    // Tab Ricevuti / Inviati + Aggiorna
+                    // Tab Ricevuti / Inviati / Bozze + Aggiorna
                     Row(
                       children: [
                         Expanded(
@@ -330,20 +469,33 @@ class _EmailScreenState extends State<EmailScreen> {
                             label: 'Ricevuti',
                             icon: Icons.inbox,
                             badge: unreadCount > 0 ? unreadCount : null,
-                            isActive: _showInbox,
-                            onTap: () => setState(() => _showInbox = true),
+                            isActive: _currentTab == EmailTab.inbox,
+                            onTap: () => setState(() => _currentTab = EmailTab.inbox),
                           ),
                         ),
-                        const SizedBox(width: 16),
+                        const SizedBox(width: 12),
                         Expanded(
                           child: _TabButton(
                             label: 'Inviati',
                             icon: Icons.send,
-                            isActive: !_showInbox,
-                            onTap: () => setState(() => _showInbox = false),
+                            isActive: _currentTab == EmailTab.sent,
+                            onTap: () => setState(() => _currentTab = EmailTab.sent),
                           ),
                         ),
-                        const SizedBox(width: 16),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: _TabButton(
+                            label: 'Bozze',
+                            icon: Icons.drafts,
+                            badge: draftCount > 0 ? draftCount : null,
+                            isActive: _currentTab == EmailTab.drafts,
+                            onTap: () async {
+                              await _reloadDrafts();
+                              setState(() => _currentTab = EmailTab.drafts);
+                            },
+                          ),
+                        ),
+                        const SizedBox(width: 12),
                         _RefreshButton(
                           isRefreshing: _isRefreshing,
                           onTap: _refreshEmails,
@@ -353,20 +505,9 @@ class _EmailScreenState extends State<EmailScreen> {
 
                     const SizedBox(height: 24),
 
-                    // Lista email
+                    // Lista email o bozze
                     Expanded(
-                      child: emails.isEmpty
-                          ? _EmptyState(isSent: !_showInbox)
-                          : ListView.separated(
-                              itemCount: emails.length,
-                              separatorBuilder: (_, __) => const SizedBox(height: 12),
-                              itemBuilder: (context, index) {
-                                return _EmailCard(
-                                  email: emails[index],
-                                  onTap: () => _openEmail(emails[index]),
-                                );
-                              },
-                            ),
+                      child: _buildEmailList(),
                     ),
                   ],
                 ),
@@ -634,24 +775,42 @@ class _TabButtonState extends State<_TabButton> {
 }
 
 class _EmptyState extends StatelessWidget {
-  final bool isSent;
+  final EmailTab type;
 
-  const _EmptyState({required this.isSent});
+  const _EmptyState({required this.type});
 
   @override
   Widget build(BuildContext context) {
+    IconData icon;
+    String message;
+
+    switch (type) {
+      case EmailTab.inbox:
+        icon = Icons.inbox;
+        message = 'Nessun messaggio';
+        break;
+      case EmailTab.sent:
+        icon = Icons.send;
+        message = 'Nessun messaggio inviato';
+        break;
+      case EmailTab.drafts:
+        icon = Icons.drafts;
+        message = 'Nessuna bozza';
+        break;
+    }
+
     return Center(
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
           Icon(
-            isSent ? Icons.send : Icons.inbox,
+            icon,
             size: 100,
             color: OlderOSTheme.textSecondary.withAlpha(128),
           ),
           const SizedBox(height: 20),
           Text(
-            isSent ? 'Nessun messaggio inviato' : 'Nessun messaggio',
+            message,
             style: Theme.of(context).textTheme.titleLarge?.copyWith(
               color: OlderOSTheme.textSecondary,
             ),
@@ -838,5 +997,174 @@ class _EmailCardState extends State<_EmailCard> {
       OlderOSTheme.emailColor,
     ];
     return colors[name.hashCode.abs() % colors.length];
+  }
+}
+
+/// Card per visualizzare una bozza
+class _DraftCard extends StatefulWidget {
+  final EmailDraft draft;
+  final VoidCallback onTap;
+  final VoidCallback onDelete;
+
+  const _DraftCard({
+    required this.draft,
+    required this.onTap,
+    required this.onDelete,
+  });
+
+  @override
+  State<_DraftCard> createState() => _DraftCardState();
+}
+
+class _DraftCardState extends State<_DraftCard> {
+  bool _isHovered = false;
+
+  String _formatDate(DateTime date) {
+    final now = DateTime.now();
+    final diff = now.difference(date);
+
+    if (diff.inMinutes < 60) {
+      return '${diff.inMinutes} min fa';
+    } else if (diff.inHours < 24) {
+      return '${diff.inHours} ore fa';
+    } else if (diff.inDays == 1) {
+      return 'Ieri';
+    } else if (diff.inDays < 7) {
+      return '${diff.inDays} giorni fa';
+    } else {
+      return '${date.day}/${date.month}/${date.year}';
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return MouseRegion(
+      onEnter: (_) => setState(() => _isHovered = true),
+      onExit: (_) => setState(() => _isHovered = false),
+      child: GestureDetector(
+        onTap: widget.onTap,
+        child: AnimatedContainer(
+          duration: const Duration(milliseconds: 150),
+          padding: const EdgeInsets.all(20),
+          decoration: BoxDecoration(
+            color: OlderOSTheme.cardBackground,
+            borderRadius: BorderRadius.circular(OlderOSTheme.borderRadiusCard),
+            border: Border.all(
+              color: _isHovered ? OlderOSTheme.warning : Colors.transparent,
+              width: 2,
+            ),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withAlpha(_isHovered ? 31 : 15),
+                blurRadius: _isHovered ? 12 : 8,
+                offset: const Offset(0, 4),
+              ),
+            ],
+          ),
+          child: Row(
+            children: [
+              // Icona bozza
+              Container(
+                width: 60,
+                height: 60,
+                decoration: BoxDecoration(
+                  color: OlderOSTheme.warning.withAlpha(51),
+                  shape: BoxShape.circle,
+                ),
+                child: const Center(
+                  child: Icon(
+                    Icons.edit_note,
+                    color: OlderOSTheme.warning,
+                    size: 32,
+                  ),
+                ),
+              ),
+
+              const SizedBox(width: 20),
+
+              // Contenuto
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      children: [
+                        Expanded(
+                          child: Text(
+                            widget.draft.to.isNotEmpty
+                                ? 'A: ${widget.draft.to}'
+                                : 'Nessun destinatario',
+                            style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                              fontWeight: FontWeight.w600,
+                              color: widget.draft.to.isEmpty
+                                  ? OlderOSTheme.textSecondary
+                                  : null,
+                            ),
+                          ),
+                        ),
+                        Text(
+                          _formatDate(widget.draft.lastModified),
+                          style: Theme.of(context).textTheme.bodyMedium,
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      widget.draft.subject.isNotEmpty
+                          ? widget.draft.subject
+                          : '(Nessun oggetto)',
+                      style: Theme.of(context).textTheme.bodyLarge?.copyWith(
+                        fontWeight: FontWeight.w500,
+                        fontStyle: widget.draft.subject.isEmpty
+                            ? FontStyle.italic
+                            : FontStyle.normal,
+                        color: widget.draft.subject.isEmpty
+                            ? OlderOSTheme.textSecondary
+                            : null,
+                      ),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      widget.draft.body.isNotEmpty
+                          ? widget.draft.body.replaceAll('\n', ' ')
+                          : '(Nessun contenuto)',
+                      style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                        color: OlderOSTheme.textSecondary,
+                        fontStyle: widget.draft.body.isEmpty
+                            ? FontStyle.italic
+                            : FontStyle.normal,
+                      ),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ],
+                ),
+              ),
+
+              const SizedBox(width: 12),
+
+              // Pulsante elimina
+              IconButton(
+                onPressed: widget.onDelete,
+                icon: const Icon(
+                  Icons.delete_outline,
+                  size: 28,
+                  color: OlderOSTheme.danger,
+                ),
+                tooltip: 'Elimina bozza',
+              ),
+
+              Icon(
+                Icons.chevron_right,
+                size: 32,
+                color: _isHovered ? OlderOSTheme.warning : OlderOSTheme.textSecondary,
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
   }
 }
