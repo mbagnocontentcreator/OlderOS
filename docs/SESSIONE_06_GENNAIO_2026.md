@@ -164,7 +164,7 @@ Implementato sistema completo di configurazione guidata al primo avvio:
 
 ### Correzioni UX (feedback utente):
 - Messaggio OAuth più chiaro: "L'accesso rapido Google non è disponibile. Usa la configurazione manuale..."
-- Icona splash cambiata da `Icons.elderly` a `Icons.sentiment_very_satisfied` (meno offensiva)
+- Avatar splash/wizard: emoji anziano sorridente 👴🏻 con tono di pelle naturale (senza riquadro)
 - Nome utente ora visibile correttamente nella home
 
 ### Funzionalità Reset Wizard (per testing):
@@ -179,6 +179,7 @@ Implementato sistema completo di configurazione guidata al primo avvio:
 c8a4f3e Implement setup wizard for first-run configuration
 a12b5d8 Fix wizard: user name display and improved OAuth message
 5b62a73 Add reset wizard option in Settings
+0956c8c Update avatar to elderly emoji and add multi-user to roadmap
 ```
 
 ## Stato finale del progetto
