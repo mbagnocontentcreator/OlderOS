@@ -21,6 +21,7 @@ class OlderOSTheme {
   static const Color calculatorColor = Color(0xFF059669);   // Verde smeraldo
   static const Color calendarColor = Color(0xFFE11D48);     // Rosa/Rosso
   static const Color tableColor = Color(0xFF0891B2);        // Ciano/Teal
+  static const Color contactsColor = Color(0xFFEA580C);     // Arancione
 
   // Spaziature
   static const double paddingCard = 24.0;

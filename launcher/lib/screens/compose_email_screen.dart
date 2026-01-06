@@ -6,13 +6,8 @@ import '../theme/olderos_theme.dart';
 import '../widgets/top_bar.dart';
 import '../services/email_service.dart';
 import '../services/draft_service.dart';
-
-class Contact {
-  final String name;
-  final String email;
-
-  const Contact({required this.name, required this.email});
-}
+import '../services/contact_service.dart';
+import 'contacts_screen.dart';
 
 /// Modalità di composizione email
 enum ComposeMode { newEmail, reply, forward }
@@ -65,20 +60,16 @@ class _ComposeEmailScreenState extends State<ComposeEmailScreen> {
 
   final _emailService = EmailService();
   final _draftService = DraftService();
+  final _contactService = ContactService();
 
   // Gestione bozze
   String? _currentDraftId;
   Timer? _autoSaveTimer;
   bool _hasUnsavedChanges = false;
 
-  // TODO: In futuro, caricare i contatti da rubrica salvata
-  final List<Contact> _contacts = const [
-    Contact(name: 'Maria (figlia)', email: 'maria@email.com'),
-    Contact(name: 'Luca (nipote)', email: 'luca@email.com'),
-    Contact(name: 'Paolo (figlio)', email: 'paolo@email.com'),
-    Contact(name: 'Anna (sorella)', email: 'anna@email.com'),
-    Contact(name: 'Dott. Rossi', email: 'rossi@studio.it'),
-  ];
+  // Contatti caricati dal servizio
+  List<Contact> _contacts = [];
+  List<Contact> _filteredContacts = [];
 
   @override
   void initState() {
@@ -86,6 +77,29 @@ class _ComposeEmailScreenState extends State<ComposeEmailScreen> {
     _initializeForMode();
     _initializeDraft();
     _startAutoSave();
+    _loadContacts();
+  }
+
+  Future<void> _loadContacts() async {
+    await _contactService.loadContacts();
+    if (mounted) {
+      setState(() {
+        _contacts = _contactService.getRecentContacts(limit: 10);
+        _filteredContacts = _contacts;
+      });
+    }
+  }
+
+  void _filterContacts(String query) {
+    if (query.isEmpty) {
+      setState(() {
+        _filteredContacts = _contactService.getRecentContacts(limit: 10);
+      });
+    } else {
+      setState(() {
+        _filteredContacts = _contactService.searchContacts(query);
+      });
+    }
   }
 
   void _initializeDraft() {
@@ -245,12 +259,27 @@ class _ComposeEmailScreenState extends State<ComposeEmailScreen> {
   }
 
   void _selectContact(Contact contact) {
+    // Aggiorna l'ultimo utilizzo
+    _contactService.markAsUsed(contact.id);
     setState(() {
       _selectedContact = contact;
       _toController.text = contact.email;
       _showContacts = false;
     });
   }
+
+  Future<void> _openContactsScreen() async {
+    final contact = await Navigator.of(context).push<Contact>(
+      MaterialPageRoute(
+        builder: (context) => const ContactsScreen(selectionMode: true),
+      ),
+    );
+
+    if (contact != null && mounted) {
+      _selectContact(contact);
+    }
+  }
+
 
   Future<void> _send() async {
     // Ottieni l'indirizzo email
@@ -496,14 +525,30 @@ class _ComposeEmailScreenState extends State<ComposeEmailScreen> {
                                       if (_selectedContact != null && value != _selectedContact!.email) {
                                         setState(() => _selectedContact = null);
                                       }
+                                      // Filtra i contatti mentre si digita
+                                      _filterContacts(value);
+                                      if (value.isNotEmpty && !_showContacts) {
+                                        setState(() => _showContacts = true);
+                                      }
                                     },
                                   ),
                                 ),
+                                // Pulsante rubrica completa
                                 IconButton(
-                                  icon: Icon(
-                                    _showContacts ? Icons.expand_less : Icons.contacts,
+                                  icon: const Icon(
+                                    Icons.contacts,
                                     size: 32,
                                     color: OlderOSTheme.primary,
+                                  ),
+                                  tooltip: 'Apri rubrica',
+                                  onPressed: _isSending ? null : _openContactsScreen,
+                                ),
+                                // Pulsante mostra/nascondi suggerimenti
+                                IconButton(
+                                  icon: Icon(
+                                    _showContacts ? Icons.expand_less : Icons.expand_more,
+                                    size: 32,
+                                    color: OlderOSTheme.textSecondary,
                                   ),
                                   onPressed: _isSending ? null : () => setState(() => _showContacts = !_showContacts),
                                 ),
@@ -511,25 +556,87 @@ class _ComposeEmailScreenState extends State<ComposeEmailScreen> {
                             ),
                           ),
 
-                          // Lista contatti
+                          // Lista contatti suggeriti / filtrati
                           if (_showContacts)
                             Container(
                               margin: const EdgeInsets.only(bottom: 16),
-                              padding: const EdgeInsets.all(8),
+                              constraints: const BoxConstraints(maxHeight: 250),
                               decoration: BoxDecoration(
                                 color: OlderOSTheme.background,
                                 borderRadius: BorderRadius.circular(12),
                                 border: Border.all(color: OlderOSTheme.primary),
                               ),
-                              child: Column(
-                                children: _contacts.map((contact) {
-                                  return _ContactTile(
-                                    contact: contact,
-                                    isSelected: _selectedContact == contact,
-                                    onTap: () => _selectContact(contact),
-                                  );
-                                }).toList(),
-                              ),
+                              child: _filteredContacts.isEmpty
+                                  ? Padding(
+                                      padding: const EdgeInsets.all(16),
+                                      child: Column(
+                                        mainAxisSize: MainAxisSize.min,
+                                        children: [
+                                          Icon(
+                                            Icons.person_add,
+                                            size: 40,
+                                            color: OlderOSTheme.textSecondary,
+                                          ),
+                                          const SizedBox(height: 8),
+                                          Text(
+                                            _contacts.isEmpty
+                                                ? 'Rubrica vuota'
+                                                : 'Nessun contatto trovato',
+                                            style: Theme.of(context).textTheme.bodyLarge?.copyWith(
+                                              color: OlderOSTheme.textSecondary,
+                                            ),
+                                          ),
+                                          const SizedBox(height: 12),
+                                          TextButton.icon(
+                                            onPressed: _openContactsScreen,
+                                            icon: const Icon(Icons.add),
+                                            label: const Text('Aggiungi contatto'),
+                                          ),
+                                        ],
+                                      ),
+                                    )
+                                  : SingleChildScrollView(
+                                      padding: const EdgeInsets.all(8),
+                                      child: Column(
+                                        children: [
+                                          ..._filteredContacts.map((contact) {
+                                            return _ContactTile(
+                                              contact: contact,
+                                              isSelected: _selectedContact?.id == contact.id,
+                                              onTap: () => _selectContact(contact),
+                                            );
+                                          }),
+                                          const Divider(),
+                                          // Link alla rubrica completa
+                                          InkWell(
+                                            onTap: _openContactsScreen,
+                                            borderRadius: BorderRadius.circular(8),
+                                            child: Padding(
+                                              padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 16),
+                                              child: Row(
+                                                mainAxisAlignment: MainAxisAlignment.center,
+                                                children: [
+                                                  Icon(
+                                                    Icons.contacts,
+                                                    size: 24,
+                                                    color: OlderOSTheme.primary,
+                                                  ),
+                                                  const SizedBox(width: 8),
+                                                  Text(
+                                                    'Apri rubrica completa',
+                                                    style: TextStyle(
+                                                      fontSize: 16,
+                                                      color: OlderOSTheme.primary,
+                                                      fontWeight: FontWeight.w600,
+                                                    ),
+                                                  ),
+                                                ],
+                                              ),
+                                            ),
+                                          ),
+                                        ],
+                                      ),
+                                    ),
                             ),
 
                           const Divider(),
@@ -760,6 +867,17 @@ class _ContactTile extends StatefulWidget {
 class _ContactTileState extends State<_ContactTile> {
   bool _isHovered = false;
 
+  Color _getAvatarColor(String name) {
+    final colors = [
+      OlderOSTheme.primary,
+      OlderOSTheme.success,
+      OlderOSTheme.warning,
+      OlderOSTheme.videoCallColor,
+      OlderOSTheme.emailColor,
+    ];
+    return colors[name.hashCode.abs() % colors.length];
+  }
+
   @override
   Widget build(BuildContext context) {
     return MouseRegion(
@@ -781,12 +899,12 @@ class _ContactTileState extends State<_ContactTile> {
                 width: 40,
                 height: 40,
                 decoration: BoxDecoration(
-                  color: OlderOSTheme.primary,
+                  color: _getAvatarColor(widget.contact.name),
                   shape: BoxShape.circle,
                 ),
                 child: Center(
                   child: Text(
-                    widget.contact.name[0].toUpperCase(),
+                    widget.contact.initials,
                     style: const TextStyle(
                       color: Colors.white,
                       fontWeight: FontWeight.bold,

@@ -13,6 +13,7 @@ import 'videocall_screen.dart';
 import 'calculator_screen.dart';
 import 'calendar_screen.dart';
 import 'table_screen.dart';
+import 'contacts_screen.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -108,6 +109,14 @@ class _HomeScreenState extends State<HomeScreen> {
     Navigator.of(context).push(
       MaterialPageRoute(
         builder: (context) => const TableScreen(),
+      ),
+    );
+  }
+
+  void _openContacts() {
+    Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (context) => const ContactsScreen(),
       ),
     );
   }
@@ -265,6 +274,12 @@ class _HomeScreenState extends State<HomeScreen> {
                         icon: Icons.email,
                         iconColor: OlderOSTheme.emailColor,
                         onTap: _openEmail,
+                      ),
+                      AppCard(
+                        label: 'RUBRICA',
+                        icon: Icons.contacts,
+                        iconColor: OlderOSTheme.contactsColor,
+                        onTap: _openContacts,
                       ),
                       AppCard(
                         label: 'SCRIVERE',
