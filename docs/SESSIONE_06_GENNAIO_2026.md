@@ -83,6 +83,35 @@ Dopo il push iniziale, la build Linux su GitHub Actions falliva per warning trat
 
 **Risultato**: Build Linux ora passa correttamente
 
+## Implementazione VIDEOCHIAMATA multi-servizio
+
+Ristrutturata completamente la schermata VIDEOCHIAMATA con approccio multi-servizio:
+
+### Funzionalità implementate:
+- **PARTECIPA**: incolla link ricevuto (Meet, Jitsi, Zoom, etc.)
+- **CREA CHIAMATA**: genera stanza Jitsi con link da condividere
+- **GOOGLE MEET**: apre direttamente meet.google.com
+- **WHATSAPP**: apre WhatsApp Web
+- **Contatti rapidi**: integrazione con rubrica per chiamate veloci
+
+### Architettura browser:
+- Creato `browser_launcher_service.dart` per gestione multi-piattaforma
+- **macOS (test)**: usa browser di sistema (Safari/Chrome) per WebRTC
+- **Linux (produzione)**: lancerà Firefox in modalità kiosk
+
+### Script Linux per sistema operativo:
+- `system/linux/scripts/launch-browser-kiosk.sh` - Lancia Firefox kiosk
+- `system/linux/scripts/install-dependencies.sh` - Installa Firefox + dipendenze
+- `system/linux/config/openbox-autostart.sh` - Avvio automatico OlderOS
+
+### Nota importante:
+Quando OlderOS diventerà un sistema operativo standalone, l'approccio dovrà essere completamente interno e nativo. Firefox sarà installato come componente del sistema e lanciato in kiosk mode.
+
+### Commit:
+```
+4a7096e Implement multi-service video call with external browser support
+```
+
 ## Stato attuale del progetto
 
 ### App completate al 100%:
@@ -97,8 +126,8 @@ Dopo il push iniziale, la build Linux su GitHub Actions falliva per warning trat
 - RUBRICA (nuova)
 - IMPOSTAZIONI (base)
 
-### App da completare:
-- VIDEOCHIAMATA - Interfaccia presente, manca integrazione reale Jitsi Meet
+### App completate (aggiornato):
+- VIDEOCHIAMATA - Multi-servizio con browser esterno (Meet, Jitsi, WhatsApp)
 
 ### Funzionalità di sistema da implementare:
 - Setup Wizard (primo avvio)
@@ -106,11 +135,11 @@ Dopo il push iniziale, la build Linux su GitHub Actions falliva per warning trat
 - Creazione immagine ISO installabile
 - Test su hardware reale con utenti anziani
 
-## Prossimi passi suggeriti
+## Prossimi passi suggeriti (ROADMAP)
 
-1. **Completare VIDEOCHIAMATA** - Integrare Jitsi Meet per chiamate reali
-2. **Setup Wizard** - Configurazione guidata al primo avvio
-3. **Test Linux** - Testare l'app su Ubuntu in VM
-4. **Configurazione Kiosk** - Setup Openbox per avvio automatico
-5. **Rifinitura UI** - Correggere warning deprecation (withOpacity → withValues)
+1. **Setup Wizard** - Configurazione guidata al primo avvio (nome utente, email, contatti familiari)
+2. **Test Linux** - Testare l'app su Ubuntu in VM
+3. **Configurazione Kiosk** - Setup Openbox per avvio automatico fullscreen
+4. **Rifinitura UI** - Correggere warning deprecation (withOpacity → withValues)
+5. **Creazione ISO** - Immagine Linux installabile con OlderOS preconfigurato
 6. **Test utente** - Provare con un anziano reale

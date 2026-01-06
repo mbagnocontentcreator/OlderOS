@@ -4,6 +4,7 @@ import 'package:intl/date_symbol_data_local.dart';
 import '../theme/olderos_theme.dart';
 import '../widgets/app_card.dart';
 import '../widgets/big_button.dart';
+import '../services/first_run_service.dart';
 import 'browser_screen.dart';
 import 'photos_screen.dart';
 import 'writer_screen.dart';
@@ -23,7 +24,8 @@ class HomeScreen extends StatefulWidget {
 }
 
 class _HomeScreenState extends State<HomeScreen> {
-  String _userName = 'Mario';
+  final _firstRunService = FirstRunService();
+  String _userName = '';
   late String _formattedDate;
   late String _formattedTime;
 
@@ -32,6 +34,32 @@ class _HomeScreenState extends State<HomeScreen> {
     super.initState();
     initializeDateFormatting('it_IT', null);
     _updateDateTime();
+    _loadUserName();
+  }
+
+  Future<void> _loadUserName() async {
+    await _firstRunService.initialize();
+    setState(() {
+      _userName = _firstRunService.userName;
+    });
+  }
+
+  String _getGreeting() {
+    final hour = DateTime.now().hour;
+    String greeting;
+
+    if (hour >= 5 && hour < 12) {
+      greeting = 'Buongiorno';
+    } else if (hour >= 12 && hour < 18) {
+      greeting = 'Buon pomeriggio';
+    } else {
+      greeting = 'Buonasera';
+    }
+
+    if (_userName.isNotEmpty) {
+      return '$greeting, $_userName!';
+    }
+    return '$greeting!';
   }
 
   void _updateDateTime() {
@@ -188,7 +216,7 @@ class _HomeScreenState extends State<HomeScreen> {
               ),
               const SizedBox(height: 16),
               Text(
-                'Buona giornata, $_userName!',
+                _userName.isNotEmpty ? 'Buona giornata, $_userName!' : 'Buona giornata!',
                 style: Theme.of(context).textTheme.bodyLarge?.copyWith(
                   color: OlderOSTheme.textSecondary,
                 ),
@@ -221,7 +249,7 @@ class _HomeScreenState extends State<HomeScreen> {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(
-                        'Buongiorno, $_userName!',
+                        _getGreeting(),
                         style: Theme.of(context).textTheme.displayLarge,
                       ),
                       const SizedBox(height: 8),

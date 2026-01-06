@@ -5,7 +5,12 @@ import '../widgets/big_button.dart';
 import '../services/email_service.dart';
 
 class EmailSetupScreen extends StatefulWidget {
-  const EmailSetupScreen({super.key});
+  final VoidCallback? onComplete;
+
+  const EmailSetupScreen({
+    super.key,
+    this.onComplete,
+  });
 
   @override
   State<EmailSetupScreen> createState() => _EmailSetupScreenState();
@@ -42,7 +47,7 @@ class _EmailSetupScreenState extends State<EmailSetupScreen> {
     if (!_emailService.isGoogleOAuthConfigured) {
       setState(() {
         _isLoading = false;
-        _error = 'OAuth Google non configurato. Contatta l\'assistenza per configurare le credenziali Google Cloud.';
+        _error = 'L\'accesso rapido Google non è disponibile.\nUsa la configurazione manuale qui sotto inserendo email e password.';
       });
       return;
     }
@@ -53,6 +58,7 @@ class _EmailSetupScreenState extends State<EmailSetupScreen> {
 
     if (error == null) {
       if (mounted) {
+        widget.onComplete?.call();
         Navigator.of(context).pop(true);
       }
     } else {
@@ -78,6 +84,7 @@ class _EmailSetupScreenState extends State<EmailSetupScreen> {
 
     if (error == null) {
       if (mounted) {
+        widget.onComplete?.call();
         Navigator.of(context).pop(true);
       }
     } else {
