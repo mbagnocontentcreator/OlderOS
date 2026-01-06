@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import '../theme/olderos_theme.dart';
 import '../widgets/top_bar.dart';
 import '../services/email_service.dart';
+import '../services/first_run_service.dart';
 
 class SettingsScreen extends StatefulWidget {
   const SettingsScreen({super.key});
@@ -127,6 +128,18 @@ class _SettingsScreenState extends State<SettingsScreen> {
                     title: 'INFORMAZIONI',
                     child: _InfoSection(),
                   ),
+
+                  const SizedBox(height: 20),
+
+                  // Reset Wizard (per testing)
+                  _SettingsCard(
+                    icon: Icons.restart_alt,
+                    iconColor: OlderOSTheme.warning,
+                    title: 'CONFIGURAZIONE INIZIALE',
+                    child: _ResetWizardSection(
+                      onReset: () => _resetWizard(),
+                    ),
+                  ),
                 ],
               ),
             ),
@@ -134,6 +147,77 @@ class _SettingsScreenState extends State<SettingsScreen> {
         ],
       ),
     );
+  }
+
+  Future<void> _resetWizard() async {
+    final confirm = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(20),
+        ),
+        title: Row(
+          children: [
+            Icon(Icons.restart_alt, color: OlderOSTheme.warning, size: 32),
+            const SizedBox(width: 12),
+            const Text('Rifare configurazione?'),
+          ],
+        ),
+        content: const Text(
+          'Al prossimo avvio vedrai di nuovo la configurazione iniziale.\n\nI tuoi dati (contatti, email) non verranno cancellati.',
+          style: TextStyle(fontSize: 18),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(false),
+            child: Text(
+              'ANNULLA',
+              style: TextStyle(
+                fontSize: 18,
+                color: OlderOSTheme.textSecondary,
+              ),
+            ),
+          ),
+          ElevatedButton(
+            onPressed: () => Navigator.of(ctx).pop(true),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: OlderOSTheme.warning,
+              foregroundColor: Colors.white,
+            ),
+            child: const Text('CONFERMA', style: TextStyle(fontSize: 18)),
+          ),
+        ],
+      ),
+    );
+
+    if (confirm == true) {
+      final firstRunService = FirstRunService();
+      await firstRunService.resetFirstRun();
+
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Row(
+              children: [
+                const Icon(Icons.check_circle, color: Colors.white, size: 28),
+                const SizedBox(width: 12),
+                const Expanded(
+                  child: Text(
+                    'Configurazione resettata. Riavvia l\'app per vedere il wizard.',
+                    style: TextStyle(fontSize: 18),
+                  ),
+                ),
+              ],
+            ),
+            backgroundColor: OlderOSTheme.success,
+            behavior: SnackBarBehavior.floating,
+            margin: const EdgeInsets.all(16),
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+            duration: const Duration(seconds: 4),
+          ),
+        );
+      }
+    }
   }
 
   void _showWifiDialog() {
@@ -731,6 +815,33 @@ class _InfoSection extends StatelessWidget {
         _InfoRow(label: 'Sistema', value: 'Ubuntu 24.04 LTS'),
         const SizedBox(height: 12),
         _InfoRow(label: 'Ultimo aggiornamento', value: 'Oggi'),
+      ],
+    );
+  }
+}
+
+class _ResetWizardSection extends StatelessWidget {
+  final VoidCallback onReset;
+
+  const _ResetWizardSection({required this.onReset});
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          'Puoi rifare la configurazione iniziale per modificare il tuo nome o altre impostazioni.',
+          style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+            color: OlderOSTheme.textSecondary,
+          ),
+        ),
+        const SizedBox(height: 16),
+        _ActionButton(
+          label: 'RIFAI CONFIGURAZIONE',
+          color: OlderOSTheme.warning,
+          onTap: onReset,
+        ),
       ],
     );
   }
