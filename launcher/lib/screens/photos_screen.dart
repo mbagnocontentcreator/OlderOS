@@ -114,7 +114,6 @@ class _PhotosScreenState extends State<PhotosScreen> {
       setState(() {
         _photos = photos;
         _currentFolder = folderPath.split('/').last;
-        _currentFolderPath = folderPath;
       });
 
       // Salva il percorso per persistenza
