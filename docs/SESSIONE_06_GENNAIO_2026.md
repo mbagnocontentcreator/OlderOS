@@ -135,11 +135,75 @@ Quando OlderOS diventerà un sistema operativo standalone, l'approccio dovrà es
 - Creazione immagine ISO installabile
 - Test su hardware reale con utenti anziani
 
-## Prossimi passi suggeriti (ROADMAP)
+## Implementazione Setup Wizard (primo avvio)
 
-1. **Setup Wizard** - Configurazione guidata al primo avvio (nome utente, email, contatti familiari)
-2. **Test Linux** - Testare l'app su Ubuntu in VM
-3. **Configurazione Kiosk** - Setup Openbox per avvio automatico fullscreen
-4. **Rifinitura UI** - Correggere warning deprecation (withOpacity → withValues)
-5. **Creazione ISO** - Immagine Linux installabile con OlderOS preconfigurato
-6. **Test utente** - Provare con un anziano reale
+Implementato sistema completo di configurazione guidata al primo avvio:
+
+### Nuovi file creati:
+- `lib/services/first_run_service.dart` - Gestione stato primo avvio e profilo utente
+- `lib/screens/setup_wizard_screen.dart` - Wizard 5 step con PageView
+
+### File modificati:
+- `lib/main.dart` - Verifica primo avvio e mostra wizard o home
+- `lib/screens/home_screen.dart` - Carica nome utente da FirstRunService
+- `lib/screens/email_setup_screen.dart` - Aggiunto callback opzionale `onComplete`
+- `lib/screens/settings_screen.dart` - Aggiunta sezione "CONFIGURAZIONE INIZIALE" con reset wizard
+
+### Funzionalità del Wizard:
+1. **Benvenuto** - Schermata introduttiva
+2. **Nome Utente** - Input nome con scelta colore avatar
+3. **Email** - Configurazione Gmail opzionale (può saltare)
+4. **Contatti Familiari** - Aggiunta contatti dalla rubrica (opzionale)
+5. **Completamento** - Riepilogo e conferma
+
+### Dettagli implementativi:
+- Persistenza con SharedPreferences
+- Saluto personalizzato in home: "Buongiorno/Buon pomeriggio/Buonasera, [Nome]!"
+- Avatar con iniziale e colore scelto
+- Possibilità di saltare step opzionali
+
+### Correzioni UX (feedback utente):
+- Messaggio OAuth più chiaro: "L'accesso rapido Google non è disponibile. Usa la configurazione manuale..."
+- Icona splash cambiata da `Icons.elderly` a `Icons.sentiment_very_satisfied` (meno offensiva)
+- Nome utente ora visibile correttamente nella home
+
+### Funzionalità Reset Wizard (per testing):
+- Sezione "CONFIGURAZIONE INIZIALE" nelle Impostazioni
+- Pulsante "RICONFIGURA WIZARD"
+- Dialog di conferma prima del reset
+- Reset completo: cancella nome, email, flag primo avvio
+- Riavvio automatico dell'app dopo reset
+
+### Commit:
+```
+c8a4f3e Implement setup wizard for first-run configuration
+a12b5d8 Fix wizard: user name display and improved OAuth message
+5b62a73 Add reset wizard option in Settings
+```
+
+## Stato finale del progetto
+
+### App completate al 100%:
+- HOME (launcher con saluto personalizzato)
+- INTERNET (browser con WebView)
+- POSTA (email completa con OAuth, allegati, bozze, multi-account)
+- SCRIVERE (editor di testo)
+- FOTO (galleria con persistenza cartelle)
+- CALCOLA (calcolatrice)
+- CALENDARIO (con eventi)
+- TABELLA (foglio elettronico)
+- RUBRICA (contatti persistenti)
+- VIDEOCHIAMATA (multi-servizio: Meet, Jitsi, WhatsApp)
+- IMPOSTAZIONI (con reset wizard)
+
+### Sistema:
+- Setup Wizard completo e funzionante
+- First Run Detection
+- Persistenza profilo utente
+
+### Da fare (ROADMAP):
+1. **Test Linux** - Testare l'app su Ubuntu in VM
+2. **Configurazione Kiosk** - Setup Openbox per avvio automatico fullscreen
+3. **Rifinitura UI** - Correggere warning deprecation (withOpacity → withValues)
+4. **Creazione ISO** - Immagine Linux installabile con OlderOS preconfigurato
+5. **Test utente** - Provare con un anziano reale
