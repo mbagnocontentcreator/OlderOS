@@ -33,7 +33,6 @@ class _PhotosScreenState extends State<PhotosScreen> {
   List<Photo> _photos = [];
   bool _isLoading = false;
   String? _currentFolder;
-  String? _currentFolderPath;
 
   // Estensioni immagini supportate
   static const _imageExtensions = ['.jpg', '.jpeg', '.png', '.gif', '.webp', '.bmp'];

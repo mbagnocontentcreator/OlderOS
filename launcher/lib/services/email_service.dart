@@ -622,8 +622,8 @@ class EmailService {
       builder.addTextPlain(body);
 
       // Aggiungi allegati se presenti
-      if (hasAttachments) {
-        for (final file in attachments!) {
+      if (attachments != null && attachments.isNotEmpty) {
+        for (final file in attachments) {
           final bytes = await file.readAsBytes();
           final fileName = file.path.split('/').last;
           final mimeType = _getMimeType(fileName);
@@ -807,7 +807,7 @@ class EmailService {
 
       if (isAttachment) {
         final fileName = contentDisposition?.filename ??
-            contentType?.parameters?['name'] ??
+            contentType?.parameters['name'] ??
             'allegato';
         final mimeType = contentType?.mediaType.text ?? 'application/octet-stream';
 

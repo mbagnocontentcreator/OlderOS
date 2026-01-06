@@ -133,18 +133,6 @@ class _CalculatorScreenState extends State<CalculatorScreen> {
     });
   }
 
-  void _onPlusMinusPressed() {
-    setState(() {
-      if (_display != '0' && _display != 'Errore') {
-        if (_display.startsWith('-')) {
-          _display = _display.substring(1);
-        } else {
-          _display = '-$_display';
-        }
-      }
-    });
-  }
-
   double _parseDisplay() {
     return double.tryParse(_display.replaceAll(',', '.')) ?? 0;
   }

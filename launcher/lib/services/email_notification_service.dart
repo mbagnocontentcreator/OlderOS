@@ -16,8 +16,7 @@ class EmailNotificationService {
   Timer? _checkTimer;
   bool _isChecking = false;
 
-  // Chiave per salvare l'ultimo ID email visto
-  static const _keyLastSeenEmailId = 'email_last_seen_id';
+  // Chiave per salvare l'ultimo timestamp
   static const _keyLastSeenTimestamp = 'email_last_seen_timestamp';
 
   // Intervallo di controllo (30 secondi)
@@ -26,8 +25,7 @@ class EmailNotificationService {
   // Callbacks per notifiche
   final List<OnNewEmailsCallback> _callbacks = [];
 
-  /// Ultimo ID email visto
-  String? _lastSeenEmailId;
+  /// Ultimo timestamp email visto
   DateTime? _lastSeenTimestamp;
 
   /// Numero di nuove email dall'ultimo controllo
@@ -42,7 +40,6 @@ class EmailNotificationService {
   /// Carica l'ultimo stato salvato
   Future<void> _loadLastSeen() async {
     final prefs = await SharedPreferences.getInstance();
-    _lastSeenEmailId = prefs.getString(_keyLastSeenEmailId);
     final timestamp = prefs.getInt(_keyLastSeenTimestamp);
     if (timestamp != null) {
       _lastSeenTimestamp = DateTime.fromMillisecondsSinceEpoch(timestamp);
@@ -50,11 +47,9 @@ class EmailNotificationService {
   }
 
   /// Salva lo stato corrente
-  Future<void> _saveLastSeen(String emailId, DateTime timestamp) async {
+  Future<void> _saveLastSeen(DateTime timestamp) async {
     final prefs = await SharedPreferences.getInstance();
-    await prefs.setString(_keyLastSeenEmailId, emailId);
     await prefs.setInt(_keyLastSeenTimestamp, timestamp.millisecondsSinceEpoch);
-    _lastSeenEmailId = emailId;
     _lastSeenTimestamp = timestamp;
   }
 
@@ -127,7 +122,7 @@ class EmailNotificationService {
 
       // Aggiorna l'ultimo check
       if (emails.isNotEmpty) {
-        await _saveLastSeen(emails.first.id, DateTime.now());
+        await _saveLastSeen(DateTime.now());
       }
     } catch (e) {
       // Ignora errori durante il check
@@ -139,7 +134,7 @@ class EmailNotificationService {
   /// Marca tutte le email come viste (reset del contatore)
   Future<void> markAllAsSeen() async {
     _newEmailCount = 0;
-    await _saveLastSeen('', DateTime.now());
+    await _saveLastSeen(DateTime.now());
   }
 
   /// Reset del contatore nuove email
