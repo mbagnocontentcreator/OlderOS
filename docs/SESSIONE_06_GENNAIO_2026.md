@@ -63,7 +63,25 @@ Implementare le 5 funzionalità della roadmap email suggerite nella sessione pre
 ## Commit
 ```
 18ac1b0 Add contacts, email search, filters, notifications and multi-account support
+2b08608 Fix warnings causing Linux build failure
+41fd5d7 Fix photos_screen.dart build error
 ```
+
+## Fix CI/CD GitHub Actions
+
+Dopo il push iniziale, la build Linux su GitHub Actions falliva per warning trattati come errori.
+
+### Correzioni applicate:
+
+| File | Problema | Soluzione |
+|------|----------|-----------|
+| `calculator_screen.dart` | Metodo `_onPlusMinusPressed` non usato | Rimosso |
+| `photos_screen.dart` | Variabile `_currentFolderPath` non usata | Rimossa dichiarazione e assegnazione |
+| `email_notification_service.dart` | Variabile `_lastSeenEmailId` non usata | Rimossa |
+| `email_service.dart` | `attachments!` asserzione non necessaria | Refactoring null check |
+| `email_service.dart` | `parameters?['name']` operatore invalido | Cambiato in `parameters['name']` |
+
+**Risultato**: Build Linux ora passa correttamente
 
 ## Stato attuale del progetto
 
