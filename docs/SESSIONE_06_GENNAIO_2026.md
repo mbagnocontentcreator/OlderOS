@@ -204,6 +204,7 @@ a12b5d8 Fix wizard: user name display and improved OAuth message
 ### Da fare (ROADMAP):
 1. **Test Linux** - Testare l'app su Ubuntu in VM
 2. **Configurazione Kiosk** - Setup Openbox per avvio automatico fullscreen
-3. **Rifinitura UI** - Correggere warning deprecation (withOpacity → withValues)
-4. **Creazione ISO** - Immagine Linux installabile con OlderOS preconfigurato
-5. **Test utente** - Provare con un anziano reale
+3. **Multiutenza** - Supporto per più utenti nella stessa famiglia (login, sessioni separate, dati privati per ogni utente)
+4. **Rifinitura UI** - Correggere warning deprecation (withOpacity → withValues)
+5. **Creazione ISO** - Immagine Linux installabile con OlderOS preconfigurato
+6. **Test utente** - Provare con un anziano reale

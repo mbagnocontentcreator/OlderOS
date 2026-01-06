@@ -210,26 +210,10 @@ class _WelcomePage extends StatelessWidget {
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          // Logo/Icona
-          Container(
-            width: 180,
-            height: 180,
-            decoration: BoxDecoration(
-              color: OlderOSTheme.primary,
-              borderRadius: BorderRadius.circular(40),
-              boxShadow: [
-                BoxShadow(
-                  color: OlderOSTheme.primary.withAlpha(100),
-                  blurRadius: 30,
-                  offset: const Offset(0, 10),
-                ),
-              ],
-            ),
-            child: const Icon(
-              Icons.sentiment_very_satisfied,
-              size: 100,
-              color: Colors.white,
-            ),
+          // Emoji anziano sorridente
+          const Text(
+            '👴🏻',
+            style: TextStyle(fontSize: 120),
           ),
 
           const SizedBox(height: 48),

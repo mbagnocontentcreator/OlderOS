@@ -75,18 +75,9 @@ class _AppStartupState extends State<_AppStartup> {
             child: Column(
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
-                Container(
-                  width: 120,
-                  height: 120,
-                  decoration: BoxDecoration(
-                    color: OlderOSTheme.primary,
-                    borderRadius: BorderRadius.circular(30),
-                  ),
-                  child: const Icon(
-                    Icons.sentiment_very_satisfied,
-                    size: 70,
-                    color: Colors.white,
-                  ),
+                const Text(
+                  '👴🏻',
+                  style: TextStyle(fontSize: 100),
                 ),
                 const SizedBox(height: 32),
                 const Text(
