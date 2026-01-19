@@ -1,5 +1,6 @@
 import 'dart:convert';
 import 'package:shared_preferences/shared_preferences.dart';
+import '../utils/user_key_provider.dart';
 
 /// Modello per un contatto
 class Contact {
@@ -106,12 +107,13 @@ class Contact {
 }
 
 /// Servizio per gestire la rubrica contatti
-class ContactService {
+class ContactService with UserKeyProvider {
   static final ContactService _instance = ContactService._internal();
   factory ContactService() => _instance;
   ContactService._internal();
 
-  static const _keyContacts = 'contacts_list';
+  static const _baseKeyContacts = 'contacts_list';
+  String get _keyContacts => getUserKey(_baseKeyContacts);
 
   List<Contact> _contacts = [];
   bool _isLoaded = false;
@@ -248,6 +250,13 @@ class ContactService {
   /// Ricarica forzatamente i contatti
   Future<void> reload() async {
     _isLoaded = false;
+    _contacts = [];
     await loadContacts();
+  }
+
+  /// Resetta lo stato interno (usato al logout)
+  void resetState() {
+    _isLoaded = false;
+    _contacts = [];
   }
 }

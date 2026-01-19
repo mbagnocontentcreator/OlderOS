@@ -4,7 +4,9 @@ import 'package:intl/date_symbol_data_local.dart';
 import '../theme/olderos_theme.dart';
 import '../widgets/app_card.dart';
 import '../widgets/big_button.dart';
+import '../widgets/user_avatar.dart';
 import '../services/first_run_service.dart';
+import '../services/user_service.dart';
 import 'browser_screen.dart';
 import 'photos_screen.dart';
 import 'writer_screen.dart';
@@ -17,7 +19,9 @@ import 'table_screen.dart';
 import 'contacts_screen.dart';
 
 class HomeScreen extends StatefulWidget {
-  const HomeScreen({super.key});
+  final VoidCallback? onSwitchUser;
+
+  const HomeScreen({super.key, this.onSwitchUser});
 
   @override
   State<HomeScreen> createState() => _HomeScreenState();
@@ -25,6 +29,7 @@ class HomeScreen extends StatefulWidget {
 
 class _HomeScreenState extends State<HomeScreen> {
   final _firstRunService = FirstRunService();
+  final _userService = UserService();
   String _userName = '';
   late String _formattedDate;
   late String _formattedTime;
@@ -38,10 +43,19 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   Future<void> _loadUserName() async {
-    await _firstRunService.initialize();
-    setState(() {
-      _userName = _firstRunService.userName;
-    });
+    // Usa il nome dal servizio utenti (multi-utente) se disponibile
+    final currentUser = _userService.currentUser;
+    if (currentUser != null) {
+      setState(() {
+        _userName = currentUser.name;
+      });
+    } else {
+      // Fallback al FirstRunService per compatibilità
+      await _firstRunService.initialize();
+      setState(() {
+        _userName = _firstRunService.userName;
+      });
+    }
   }
 
   String _getGreeting() {
@@ -191,6 +205,81 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
+  Widget _buildUserAvatarButton() {
+    final currentUser = _userService.currentUser;
+    if (currentUser == null) return const SizedBox.shrink();
+
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        onTap: _showSwitchUserDialog,
+        borderRadius: BorderRadius.circular(30),
+        child: Container(
+          padding: const EdgeInsets.all(4),
+          decoration: BoxDecoration(
+            shape: BoxShape.circle,
+            border: Border.all(
+              color: UserAvatarColors.getColor(currentUser.avatarColorIndex),
+              width: 3,
+            ),
+          ),
+          child: UserAvatar(
+            user: currentUser,
+            size: 48,
+            showName: false,
+          ),
+        ),
+      ),
+    );
+  }
+
+  void _showSwitchUserDialog() {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(OlderOSTheme.borderRadiusCard),
+        ),
+        title: Text(
+          'Cambiare utente?',
+          style: Theme.of(context).textTheme.displayMedium,
+          textAlign: TextAlign.center,
+        ),
+        content: Text(
+          'Verrai disconnesso e potrai scegliere un altro utente.',
+          style: Theme.of(context).textTheme.bodyLarge,
+          textAlign: TextAlign.center,
+        ),
+        actionsAlignment: MainAxisAlignment.center,
+        actions: [
+          Padding(
+            padding: const EdgeInsets.all(16),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                BigButton(
+                  label: 'No, resta',
+                  backgroundColor: OlderOSTheme.textSecondary,
+                  onTap: () => Navigator.of(context).pop(),
+                ),
+                const SizedBox(width: 24),
+                BigButton(
+                  label: 'Si, cambia',
+                  icon: Icons.person,
+                  backgroundColor: OlderOSTheme.primary,
+                  onTap: () {
+                    Navigator.of(context).pop();
+                    widget.onSwitchUser?.call();
+                  },
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
   void _showShuttingDown() {
     showDialog(
       context: context,
@@ -263,19 +352,28 @@ class _HomeScreenState extends State<HomeScreen> {
                       ),
                     ],
                   ),
-                  Column(
-                    crossAxisAlignment: CrossAxisAlignment.end,
+                  Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Text(
-                        _formattedDate,
-                        style: Theme.of(context).textTheme.titleLarge,
+                      Column(
+                        crossAxisAlignment: CrossAxisAlignment.end,
+                        children: [
+                          Text(
+                            _formattedDate,
+                            style: Theme.of(context).textTheme.titleLarge,
+                          ),
+                          Text(
+                            'ore $_formattedTime',
+                            style: Theme.of(context).textTheme.displayMedium?.copyWith(
+                              color: OlderOSTheme.primary,
+                            ),
+                          ),
+                        ],
                       ),
-                      Text(
-                        'ore $_formattedTime',
-                        style: Theme.of(context).textTheme.displayMedium?.copyWith(
-                          color: OlderOSTheme.primary,
-                        ),
-                      ),
+                      if (widget.onSwitchUser != null) ...[
+                        const SizedBox(width: 24),
+                        _buildUserAvatarButton(),
+                      ],
                     ],
                   ),
                 ],

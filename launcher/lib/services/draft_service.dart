@@ -1,5 +1,6 @@
 import 'dart:convert';
 import 'package:shared_preferences/shared_preferences.dart';
+import '../utils/user_key_provider.dart';
 
 /// Modello per una bozza email
 class EmailDraft {
@@ -38,12 +39,13 @@ class EmailDraft {
 }
 
 /// Servizio per gestire le bozze email localmente
-class DraftService {
+class DraftService with UserKeyProvider {
   static final DraftService _instance = DraftService._internal();
   factory DraftService() => _instance;
   DraftService._internal();
 
-  static const _keyDrafts = 'email_drafts';
+  static const _baseKeyDrafts = 'email_drafts';
+  String get _keyDrafts => getUserKey(_baseKeyDrafts);
 
   List<EmailDraft> _drafts = [];
   bool _isLoaded = false;
@@ -140,5 +142,18 @@ class DraftService {
   Future<int> getDraftCount() async {
     await loadDrafts();
     return _drafts.length;
+  }
+
+  /// Ricarica forzatamente le bozze
+  Future<void> reload() async {
+    _isLoaded = false;
+    _drafts = [];
+    await loadDrafts();
+  }
+
+  /// Resetta lo stato interno (usato al logout)
+  void resetState() {
+    _isLoaded = false;
+    _drafts = [];
   }
 }

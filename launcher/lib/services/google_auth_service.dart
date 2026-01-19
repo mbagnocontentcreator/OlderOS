@@ -4,9 +4,10 @@ import 'dart:io';
 import 'package:http/http.dart' as http;
 import 'package:url_launcher/url_launcher.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import '../utils/user_key_provider.dart';
 
 /// Gestisce l'autenticazione OAuth2 con Google per Gmail
-class GoogleAuthService {
+class GoogleAuthService with UserKeyProvider {
   static final GoogleAuthService _instance = GoogleAuthService._internal();
   factory GoogleAuthService() => _instance;
   GoogleAuthService._internal();
@@ -28,14 +29,23 @@ class GoogleAuthService {
     'profile',
   ];
 
-  // Chiavi per SharedPreferences
-  static const _keyClientId = 'google_oauth_client_id';
-  static const _keyClientSecret = 'google_oauth_client_secret';
-  static const _keyAccessToken = 'google_oauth_access_token';
-  static const _keyRefreshToken = 'google_oauth_refresh_token';
-  static const _keyTokenExpiry = 'google_oauth_token_expiry';
-  static const _keyUserEmail = 'google_oauth_user_email';
-  static const _keyUserName = 'google_oauth_user_name';
+  // Chiavi base per SharedPreferences
+  static const _baseKeyClientId = 'google_oauth_client_id';
+  static const _baseKeyClientSecret = 'google_oauth_client_secret';
+  static const _baseKeyAccessToken = 'google_oauth_access_token';
+  static const _baseKeyRefreshToken = 'google_oauth_refresh_token';
+  static const _baseKeyTokenExpiry = 'google_oauth_token_expiry';
+  static const _baseKeyUserEmail = 'google_oauth_user_email';
+  static const _baseKeyUserName = 'google_oauth_user_name';
+
+  // Getter per chiavi prefissate
+  String get _keyClientId => getUserKey(_baseKeyClientId);
+  String get _keyClientSecret => getUserKey(_baseKeyClientSecret);
+  String get _keyAccessToken => getUserKey(_baseKeyAccessToken);
+  String get _keyRefreshToken => getUserKey(_baseKeyRefreshToken);
+  String get _keyTokenExpiry => getUserKey(_baseKeyTokenExpiry);
+  String get _keyUserEmail => getUserKey(_baseKeyUserEmail);
+  String get _keyUserName => getUserKey(_baseKeyUserName);
 
   String? _userEmail;
   String? _userName;
@@ -384,5 +394,25 @@ class GoogleAuthService {
 </html>
 ''';
     }
+  }
+
+  /// Ricarica i dati per l'utente corrente (chiamare dopo cambio utente)
+  Future<void> reload() async {
+    _accessToken = null;
+    _refreshToken = null;
+    _tokenExpiry = null;
+    _userEmail = null;
+    _userName = null;
+    // Mantieni clientId e clientSecret perche' potrebbero essere condivisi
+    await loadSavedCredentials();
+  }
+
+  /// Resetta lo stato interno (usato al logout)
+  void resetState() {
+    _accessToken = null;
+    _refreshToken = null;
+    _tokenExpiry = null;
+    _userEmail = null;
+    _userName = null;
   }
 }

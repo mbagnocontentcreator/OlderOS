@@ -3,6 +3,7 @@ import 'dart:io';
 import 'package:enough_mail/enough_mail.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'google_auth_service.dart';
+import '../utils/user_key_provider.dart';
 
 /// Tipo di autenticazione email
 enum EmailAuthType {
@@ -102,7 +103,7 @@ class EmailMessage {
 }
 
 /// Servizio per gestire email IMAP/SMTP
-class EmailService {
+class EmailService with UserKeyProvider {
   static final EmailService _instance = EmailService._internal();
   factory EmailService() => _instance;
   EmailService._internal();
@@ -122,15 +123,25 @@ class EmailService {
   EmailAuthType? get authType => _credentials?.authType;
   bool get isGoogleAuth => _credentials?.authType == EmailAuthType.oauth2;
 
-  // Chiavi per SharedPreferences
-  static const _keyEmail = 'email_account_email';
-  static const _keyPassword = 'email_account_password';
-  static const _keyDisplayName = 'email_account_display_name';
-  static const _keyAuthType = 'email_account_auth_type';
-  static const _keyImapHost = 'email_account_imap_host';
-  static const _keyImapPort = 'email_account_imap_port';
-  static const _keySmtpHost = 'email_account_smtp_host';
-  static const _keySmtpPort = 'email_account_smtp_port';
+  // Chiavi base per SharedPreferences
+  static const _baseKeyEmail = 'email_account_email';
+  static const _baseKeyPassword = 'email_account_password';
+  static const _baseKeyDisplayName = 'email_account_display_name';
+  static const _baseKeyAuthType = 'email_account_auth_type';
+  static const _baseKeyImapHost = 'email_account_imap_host';
+  static const _baseKeyImapPort = 'email_account_imap_port';
+  static const _baseKeySmtpHost = 'email_account_smtp_host';
+  static const _baseKeySmtpPort = 'email_account_smtp_port';
+
+  // Getter per chiavi prefissate
+  String get _keyEmail => getUserKey(_baseKeyEmail);
+  String get _keyPassword => getUserKey(_baseKeyPassword);
+  String get _keyDisplayName => getUserKey(_baseKeyDisplayName);
+  String get _keyAuthType => getUserKey(_baseKeyAuthType);
+  String get _keyImapHost => getUserKey(_baseKeyImapHost);
+  String get _keyImapPort => getUserKey(_baseKeyImapPort);
+  String get _keySmtpHost => getUserKey(_baseKeySmtpHost);
+  String get _keySmtpPort => getUserKey(_baseKeySmtpPort);
 
   /// Carica credenziali salvate
   Future<bool> loadSavedCredentials() async {
@@ -841,5 +852,22 @@ class EmailService {
     }
 
     return attachments;
+  }
+
+  /// Ricarica i dati per l'utente corrente (chiamare dopo cambio utente)
+  Future<void> reload() async {
+    await disconnect();
+    _credentials = null;
+    _mailAccount = null;
+    _isConfigured = false;
+    await loadSavedCredentials();
+  }
+
+  /// Resetta lo stato interno (usato al logout)
+  Future<void> resetState() async {
+    await disconnect();
+    _credentials = null;
+    _mailAccount = null;
+    _isConfigured = false;
   }
 }

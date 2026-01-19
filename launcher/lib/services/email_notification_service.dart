@@ -2,12 +2,13 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'email_service.dart';
+import '../utils/user_key_provider.dart';
 
 /// Callback per quando arrivano nuove email
 typedef OnNewEmailsCallback = void Function(int newCount, List<EmailMessage> newEmails);
 
 /// Servizio per controllare e notificare nuove email
-class EmailNotificationService {
+class EmailNotificationService with UserKeyProvider {
   static final EmailNotificationService _instance = EmailNotificationService._internal();
   factory EmailNotificationService() => _instance;
   EmailNotificationService._internal();
@@ -16,8 +17,9 @@ class EmailNotificationService {
   Timer? _checkTimer;
   bool _isChecking = false;
 
-  // Chiave per salvare l'ultimo timestamp
-  static const _keyLastSeenTimestamp = 'email_last_seen_timestamp';
+  // Chiave base per salvare l'ultimo timestamp
+  static const _baseKeyLastSeenTimestamp = 'email_last_seen_timestamp';
+  String get _keyLastSeenTimestamp => getUserKey(_baseKeyLastSeenTimestamp);
 
   // Intervallo di controllo (30 secondi)
   static const _checkInterval = Duration(seconds: 30);
@@ -146,6 +148,21 @@ class EmailNotificationService {
   void dispose() {
     stopChecking();
     _callbacks.clear();
+  }
+
+  /// Ricarica i dati per l'utente corrente (chiamare dopo cambio utente)
+  Future<void> reload() async {
+    stopChecking();
+    _newEmailCount = 0;
+    _lastSeenTimestamp = null;
+    await initialize();
+  }
+
+  /// Resetta lo stato interno (usato al logout)
+  void resetState() {
+    stopChecking();
+    _newEmailCount = 0;
+    _lastSeenTimestamp = null;
   }
 }
 

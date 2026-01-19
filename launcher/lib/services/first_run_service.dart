@@ -1,15 +1,21 @@
 import 'package:shared_preferences/shared_preferences.dart';
+import '../utils/user_key_provider.dart';
 
 /// Servizio per gestire il primo avvio e le impostazioni utente
-class FirstRunService {
+class FirstRunService with UserKeyProvider {
   static final FirstRunService _instance = FirstRunService._internal();
   factory FirstRunService() => _instance;
   FirstRunService._internal();
 
-  // Chiavi per SharedPreferences
-  static const _keyFirstRunComplete = 'first_run_complete';
-  static const _keyUserName = 'user_name';
-  static const _keyUserAvatar = 'user_avatar_color';
+  // Chiavi base per SharedPreferences (verranno prefissate con user_id)
+  static const _baseKeyFirstRunComplete = 'first_run_complete';
+  static const _baseKeyUserName = 'user_name';
+  static const _baseKeyUserAvatar = 'user_avatar_color';
+
+  // Getter per chiavi prefissate
+  String get _keyFirstRunComplete => getUserKey(_baseKeyFirstRunComplete);
+  String get _keyUserName => getUserKey(_baseKeyUserName);
+  String get _keyUserAvatar => getUserKey(_baseKeyUserAvatar);
 
   bool _isFirstRun = true;
   String _userName = '';
@@ -59,5 +65,20 @@ class FirstRunService {
     final prefs = await SharedPreferences.getInstance();
     await prefs.setBool(_keyFirstRunComplete, false);
     _isFirstRun = true;
+  }
+
+  /// Ricarica i dati per l'utente corrente (chiamare dopo cambio utente)
+  Future<void> reload() async {
+    _isFirstRun = true;
+    _userName = '';
+    _avatarColorIndex = 0;
+    await initialize();
+  }
+
+  /// Resetta lo stato interno (usato al logout)
+  void resetState() {
+    _isFirstRun = true;
+    _userName = '';
+    _avatarColorIndex = 0;
   }
 }

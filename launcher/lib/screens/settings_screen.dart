@@ -1,8 +1,11 @@
 import 'package:flutter/material.dart';
 import '../theme/olderos_theme.dart';
 import '../widgets/top_bar.dart';
+import '../widgets/user_avatar.dart';
 import '../services/email_service.dart';
 import '../services/first_run_service.dart';
+import '../services/user_service.dart';
+import 'user_setup_screen.dart';
 
 class SettingsScreen extends StatefulWidget {
   const SettingsScreen({super.key});
@@ -116,6 +119,22 @@ class _SettingsScreenState extends State<SettingsScreen> {
                     child: _EmailConfigSection(
                       onConfigure: () => _showOAuthConfigDialog(),
                       onRemoveAccount: () => _showRemoveAccountDialog(),
+                    ),
+                  ),
+
+                  const SizedBox(height: 20),
+
+                  // Gestione Utenti
+                  _SettingsCard(
+                    icon: Icons.people,
+                    iconColor: OlderOSTheme.primary,
+                    title: 'GESTIONE UTENTI',
+                    trailing: _StatusBadge(
+                      label: '${UserService().userCount}/${UserService.maxUsers}',
+                      color: OlderOSTheme.primary,
+                    ),
+                    child: _UserManagementSection(
+                      onRefresh: () => setState(() {}),
                     ),
                   ),
 
@@ -1141,6 +1160,308 @@ class _EmailConfigSection extends StatelessWidget {
           ],
         ),
       ],
+    );
+  }
+}
+
+class _UserManagementSection extends StatelessWidget {
+  final VoidCallback onRefresh;
+
+  const _UserManagementSection({required this.onRefresh});
+
+  @override
+  Widget build(BuildContext context) {
+    final userService = UserService();
+    final users = userService.users;
+    final currentUser = userService.currentUser;
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        // Lista utenti
+        ...users.map((user) => Padding(
+          padding: const EdgeInsets.only(bottom: 12),
+          child: _UserTile(
+            user: user,
+            isCurrentUser: user.id == currentUser?.id,
+            onChangePin: () => _showChangePinDialog(context, user),
+            onDelete: users.length > 1 ? () => _showDeleteUserDialog(context, user, onRefresh) : null,
+          ),
+        )),
+
+        const SizedBox(height: 8),
+
+        // Pulsante aggiungi utente
+        if (userService.canAddUser)
+          _ActionButton(
+            label: 'AGGIUNGI UTENTE',
+            color: OlderOSTheme.success,
+            onTap: () => _showAddUserInfo(context),
+          ),
+      ],
+    );
+  }
+
+  void _showChangePinDialog(BuildContext context, User user) {
+    final oldPinController = TextEditingController();
+    final newPinController = TextEditingController();
+    final confirmPinController = TextEditingController();
+
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(20),
+        ),
+        title: Row(
+          children: [
+            const Icon(Icons.lock, color: OlderOSTheme.primary, size: 32),
+            const SizedBox(width: 12),
+            Text('Cambia PIN di ${user.name}'),
+          ],
+        ),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            TextField(
+              controller: oldPinController,
+              keyboardType: TextInputType.number,
+              obscureText: true,
+              maxLength: 6,
+              decoration: InputDecoration(
+                labelText: 'PIN attuale',
+                border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
+              ),
+            ),
+            const SizedBox(height: 16),
+            TextField(
+              controller: newPinController,
+              keyboardType: TextInputType.number,
+              obscureText: true,
+              maxLength: 6,
+              decoration: InputDecoration(
+                labelText: 'Nuovo PIN',
+                border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
+              ),
+            ),
+            const SizedBox(height: 16),
+            TextField(
+              controller: confirmPinController,
+              keyboardType: TextInputType.number,
+              obscureText: true,
+              maxLength: 6,
+              decoration: InputDecoration(
+                labelText: 'Conferma nuovo PIN',
+                border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
+              ),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(),
+            child: const Text('ANNULLA', style: TextStyle(fontSize: 18)),
+          ),
+          ElevatedButton(
+            onPressed: () async {
+              if (newPinController.text != confirmPinController.text) {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(content: Text('I PIN non corrispondono')),
+                );
+                return;
+              }
+              try {
+                await UserService().changePin(
+                  user.id,
+                  oldPinController.text,
+                  newPinController.text,
+                );
+                Navigator.of(ctx).pop();
+                ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(
+                    content: const Text('PIN cambiato con successo!'),
+                    backgroundColor: OlderOSTheme.success,
+                  ),
+                );
+              } catch (e) {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(
+                    content: Text(e.toString()),
+                    backgroundColor: OlderOSTheme.danger,
+                  ),
+                );
+              }
+            },
+            child: const Text('CAMBIA', style: TextStyle(fontSize: 18)),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _showDeleteUserDialog(BuildContext context, User user, VoidCallback onRefresh) {
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(20),
+        ),
+        title: Row(
+          children: [
+            const Icon(Icons.warning, color: OlderOSTheme.danger, size: 32),
+            const SizedBox(width: 12),
+            const Text('Eliminare utente?'),
+          ],
+        ),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              'Vuoi eliminare ${user.name}?',
+              style: const TextStyle(fontSize: 20),
+            ),
+            const SizedBox(height: 12),
+            const Text(
+              'Tutti i dati di questo utente verranno cancellati permanentemente.',
+              style: TextStyle(fontSize: 16, color: OlderOSTheme.danger),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(),
+            child: const Text('ANNULLA', style: TextStyle(fontSize: 18)),
+          ),
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(backgroundColor: OlderOSTheme.danger),
+            onPressed: () async {
+              await UserService().deleteUser(user.id);
+              Navigator.of(ctx).pop();
+              onRefresh();
+              ScaffoldMessenger.of(context).showSnackBar(
+                SnackBar(
+                  content: Text('${user.name} eliminato'),
+                  backgroundColor: OlderOSTheme.textSecondary,
+                ),
+              );
+            },
+            child: const Text('ELIMINA', style: TextStyle(fontSize: 18)),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _showAddUserInfo(BuildContext context) {
+    Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (context) => UserSetupScreen(
+          isFirstUser: false,
+          autoLogin: false,
+          onComplete: () {
+            Navigator.of(context).pop();
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(
+                content: Text(
+                  'Nuovo utente creato con successo!',
+                  style: TextStyle(fontSize: 18),
+                ),
+                backgroundColor: OlderOSTheme.success,
+              ),
+            );
+            onRefresh();
+          },
+          onCancel: () {
+            Navigator.of(context).pop();
+          },
+        ),
+      ),
+    );
+  }
+}
+
+class _UserTile extends StatelessWidget {
+  final User user;
+  final bool isCurrentUser;
+  final VoidCallback onChangePin;
+  final VoidCallback? onDelete;
+
+  const _UserTile({
+    required this.user,
+    required this.isCurrentUser,
+    required this.onChangePin,
+    this.onDelete,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: isCurrentUser
+            ? OlderOSTheme.primary.withOpacity(0.1)
+            : Colors.grey.shade100,
+        borderRadius: BorderRadius.circular(12),
+        border: isCurrentUser
+            ? Border.all(color: OlderOSTheme.primary, width: 2)
+            : null,
+      ),
+      child: Row(
+        children: [
+          UserAvatar(user: user, size: 48),
+          const SizedBox(width: 16),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    Text(
+                      user.name,
+                      style: const TextStyle(
+                        fontSize: 20,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                    if (isCurrentUser) ...[
+                      const SizedBox(width: 8),
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                        decoration: BoxDecoration(
+                          color: OlderOSTheme.primary,
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                        child: const Text(
+                          'Tu',
+                          style: TextStyle(
+                            color: Colors.white,
+                            fontSize: 14,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ],
+                ),
+              ],
+            ),
+          ),
+          IconButton(
+            onPressed: onChangePin,
+            icon: const Icon(Icons.lock, size: 24),
+            tooltip: 'Cambia PIN',
+            color: OlderOSTheme.primary,
+          ),
+          if (onDelete != null)
+            IconButton(
+              onPressed: onDelete,
+              icon: const Icon(Icons.delete, size: 24),
+              tooltip: 'Elimina utente',
+              color: OlderOSTheme.danger,
+            ),
+        ],
+      ),
     );
   }
 }

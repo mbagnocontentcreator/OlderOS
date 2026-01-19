@@ -1,6 +1,7 @@
 import 'dart:convert';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'email_service.dart';
+import '../utils/user_key_provider.dart';
 
 /// Modello per un account email salvato
 class SavedEmailAccount {
@@ -83,13 +84,15 @@ class SavedEmailAccount {
 }
 
 /// Servizio per gestire piu account email
-class EmailAccountsService {
+class EmailAccountsService with UserKeyProvider {
   static final EmailAccountsService _instance = EmailAccountsService._internal();
   factory EmailAccountsService() => _instance;
   EmailAccountsService._internal();
 
-  static const _keyAccounts = 'email_accounts_list';
-  static const _keyActiveAccount = 'email_active_account_id';
+  static const _baseKeyAccounts = 'email_accounts_list';
+  static const _baseKeyActiveAccount = 'email_active_account_id';
+  String get _keyAccounts => getUserKey(_baseKeyAccounts);
+  String get _keyActiveAccount => getUserKey(_baseKeyActiveAccount);
 
   List<SavedEmailAccount> _accounts = [];
   String? _activeAccountId;
@@ -220,6 +223,15 @@ class EmailAccountsService {
   /// Ricarica forzatamente
   Future<void> reload() async {
     _isLoaded = false;
+    _accounts = [];
+    _activeAccountId = null;
     await loadAccounts();
+  }
+
+  /// Resetta lo stato interno (usato al logout)
+  void resetState() {
+    _isLoaded = false;
+    _accounts = [];
+    _activeAccountId = null;
   }
 }

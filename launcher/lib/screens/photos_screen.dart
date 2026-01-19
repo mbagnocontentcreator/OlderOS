@@ -5,6 +5,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import '../theme/olderos_theme.dart';
 import '../widgets/top_bar.dart';
 import '../widgets/big_button.dart';
+import '../services/user_service.dart';
 import 'photo_viewer_screen.dart';
 
 class Photo {
@@ -37,8 +38,15 @@ class _PhotosScreenState extends State<PhotosScreen> {
   // Estensioni immagini supportate
   static const _imageExtensions = ['.jpg', '.jpeg', '.png', '.gif', '.webp', '.bmp'];
 
-  // Chiave per salvare il percorso della cartella
-  static const _folderPathKey = 'photos_folder_path';
+  // Chiave base per salvare il percorso della cartella
+  static const _baseFolderPathKey = 'photos_folder_path';
+
+  // Getter per chiave prefissata con user_id
+  String get _folderPathKey {
+    final userId = UserService().currentUser?.id;
+    if (userId == null) return _baseFolderPathKey;
+    return '${userId}_$_baseFolderPathKey';
+  }
 
   @override
   void initState() {
