@@ -69,12 +69,18 @@ return HomeScreen(
 - Migrazione dati legacy al primo utente
 - Blocco dopo 5 tentativi errati (5 minuti)
 
-### Prossimi passi (da roadmap)
-- Test su Linux
-- Configurazione Kiosk mode
-- Rifinitura UI
-- Creazione ISO
-- Test con utenti reali
+### Prossima sessione
+**Test su Linux** - Priorità per la prossima sessione di lavoro:
+- Build dell'app per Linux
+- Verifica compatibilità e funzionamento
+- Propedeutico a Kiosk mode e creazione ISO
+
+### Roadmap rimanente
+1. ~~Test su Linux~~ (prossima sessione)
+2. Configurazione Kiosk mode
+3. Rifinitura UI
+4. Creazione ISO
+5. Test con utenti reali
 
 ## Note
 Il sistema multi-utente avvia automaticamente il Setup Wizard per ogni nuovo utente, permettendo una configurazione personalizzata (nome, preferenze, ecc.) indipendente dagli altri profili.
