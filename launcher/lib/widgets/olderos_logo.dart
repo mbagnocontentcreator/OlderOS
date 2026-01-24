@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import '../theme/olderos_theme.dart';
 
-/// Logo OlderOS - Widget cross-platform che non dipende da emoji
+/// Logo OlderOS - Widget cross-platform con emoji anziano
 class OlderOSLogo extends StatelessWidget {
   final double size;
   final bool showText;
@@ -17,32 +17,12 @@ class OlderOSLogo extends StatelessWidget {
     return Column(
       mainAxisSize: MainAxisSize.min,
       children: [
-        Container(
+        // Emoji anziano come immagine (funziona su tutte le piattaforme)
+        Image.asset(
+          'assets/images/elderly_emoji.png',
           width: size,
           height: size,
-          decoration: BoxDecoration(
-            gradient: LinearGradient(
-              begin: Alignment.topLeft,
-              end: Alignment.bottomRight,
-              colors: [
-                OlderOSTheme.primary,
-                OlderOSTheme.primary.withValues(alpha: 0.7),
-              ],
-            ),
-            shape: BoxShape.circle,
-            boxShadow: [
-              BoxShadow(
-                color: OlderOSTheme.primary.withValues(alpha: 0.4),
-                blurRadius: size * 0.2,
-                offset: Offset(0, size * 0.08),
-              ),
-            ],
-          ),
-          child: Icon(
-            Icons.elderly,
-            size: size * 0.55,
-            color: Colors.white,
-          ),
+          filterQuality: FilterQuality.high,
         ),
         if (showText) ...[
           SizedBox(height: size * 0.24),
