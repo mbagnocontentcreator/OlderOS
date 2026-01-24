@@ -150,6 +150,12 @@ class _UserSetupScreenState extends State<UserSetupScreen> {
                   setState(() {
                     _currentPage = page;
                   });
+                  // Richiedi focus per tastiera quando arrivi alle pagine PIN
+                  if (page == 2 || page == 3) {
+                    WidgetsBinding.instance.addPostFrameCallback((_) {
+                      _keyboardFocusNode.requestFocus();
+                    });
+                  }
                 },
                 children: [
                   _buildNamePage(),
