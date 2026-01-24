@@ -4,6 +4,7 @@ import '../services/first_run_service.dart';
 import '../services/contact_service.dart';
 import '../services/user_service.dart';
 import '../widgets/user_avatar.dart';
+import '../widgets/olderos_logo.dart';
 import 'email_setup_screen.dart';
 
 /// Wizard di configurazione iniziale per OlderOS
@@ -212,11 +213,8 @@ class _WelcomePage extends StatelessWidget {
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          // Emoji anziano sorridente
-          const Text(
-            '👴🏻',
-            style: TextStyle(fontSize: 120),
-          ),
+          // Logo OlderOS (cross-platform, non dipende da emoji)
+          const OlderOSLogo(size: 120),
 
           const SizedBox(height: 48),
 

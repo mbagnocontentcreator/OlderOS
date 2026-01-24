@@ -12,6 +12,7 @@ import 'services/email_service.dart';
 import 'services/email_accounts_service.dart';
 import 'services/draft_service.dart';
 import 'services/email_notification_service.dart';
+import 'widgets/olderos_logo.dart';
 
 void main() {
   runApp(const OlderOSApp());
@@ -251,23 +252,12 @@ class _AppStartupState extends State<_AppStartup> {
             ],
           ),
         ),
-        child: const Center(
+        child: Center(
           child: Column(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              Text(
-                '👴🏻',
-                style: TextStyle(fontSize: 100),
-              ),
-              SizedBox(height: 32),
-              Text(
-                'OlderOS',
-                style: TextStyle(
-                  fontSize: 36,
-                  fontWeight: FontWeight.bold,
-                ),
-              ),
-              SizedBox(height: 24),
+              const OlderOSLogo(size: 120, showText: true),
+              const SizedBox(height: 32),
               CircularProgressIndicator(
                 color: OlderOSTheme.primary,
               ),

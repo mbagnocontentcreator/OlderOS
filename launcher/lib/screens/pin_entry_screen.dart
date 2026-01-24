@@ -31,6 +31,15 @@ class _PinEntryScreenState extends State<PinEntryScreen> {
   bool _shake = false;
 
   @override
+  void initState() {
+    super.initState();
+    // Richiedi il focus esplicitamente dopo il build (necessario su Linux)
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _focusNode.requestFocus();
+    });
+  }
+
+  @override
   void dispose() {
     _focusNode.dispose();
     super.dispose();
