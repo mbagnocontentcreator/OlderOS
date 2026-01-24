@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import '../theme/olderos_theme.dart';
 import '../services/first_run_service.dart';
 import '../services/contact_service.dart';
+import '../services/user_service.dart';
+import '../widgets/user_avatar.dart';
 import 'email_setup_screen.dart';
 
 /// Wizard di configurazione iniziale per OlderOS
@@ -20,28 +22,28 @@ class SetupWizardScreen extends StatefulWidget {
 class _SetupWizardScreenState extends State<SetupWizardScreen> {
   final _firstRunService = FirstRunService();
   final _contactService = ContactService();
+  final _userService = UserService();
   final _pageController = PageController();
 
   int _currentPage = 0;
-  static const _totalPages = 5;
+  static const _totalPages = 4; // Ridotto da 5 a 4 (rimossa pagina nome)
 
-  // Dati raccolti
+  // Dati dall'account utente (non piu' richiesti)
   String _userName = '';
   int _avatarColorIndex = 0;
   bool _emailConfigured = false;
   final List<_FamilyContact> _familyContacts = [];
 
-  // Colori avatar disponibili
-  static const _avatarColors = [
-    Color(0xFF2196F3), // Blu
-    Color(0xFF4CAF50), // Verde
-    Color(0xFFE91E63), // Rosa
-    Color(0xFF9C27B0), // Viola
-    Color(0xFFFF5722), // Arancione
-    Color(0xFF00BCD4), // Ciano
-    Color(0xFF795548), // Marrone
-    Color(0xFF607D8B), // Grigio blu
-  ];
+  @override
+  void initState() {
+    super.initState();
+    // Carica nome e avatar dall'account utente gia' creato
+    final currentUser = _userService.currentUser;
+    if (currentUser != null) {
+      _userName = currentUser.name;
+      _avatarColorIndex = currentUser.avatarColorIndex;
+    }
+  }
 
   void _nextPage() {
     if (_currentPage < _totalPages - 1) {
@@ -62,7 +64,8 @@ class _SetupWizardScreenState extends State<SetupWizardScreen> {
   }
 
   Future<void> _completeSetup() async {
-    // Salva nome utente
+    // Nome e avatar sono gia' salvati nell'account utente
+    // Li sincronizziamo anche nel FirstRunService per compatibilita'
     await _firstRunService.setUserName(_userName);
     await _firstRunService.setAvatarColor(_avatarColorIndex);
 
@@ -110,7 +113,8 @@ class _SetupWizardScreenState extends State<SetupWizardScreen> {
                 ),
               ),
 
-              // Pages
+              // Pages (4 pagine: Benvenuto, Email, Contatti, Completamento)
+              // Nome e avatar sono gia' stati raccolti nella creazione account
               Expanded(
                 child: PageView(
                   controller: _pageController,
@@ -119,15 +123,9 @@ class _SetupWizardScreenState extends State<SetupWizardScreen> {
                     setState(() => _currentPage = page);
                   },
                   children: [
-                    _WelcomePage(onNext: _nextPage),
-                    _UserNamePage(
+                    _WelcomePage(
                       userName: _userName,
-                      avatarColorIndex: _avatarColorIndex,
-                      avatarColors: _avatarColors,
-                      onUserNameChanged: (name) => setState(() => _userName = name),
-                      onAvatarColorChanged: (index) => setState(() => _avatarColorIndex = index),
                       onNext: _nextPage,
-                      onBack: _previousPage,
                     ),
                     _EmailSetupPage(
                       emailConfigured: _emailConfigured,
@@ -143,7 +141,7 @@ class _SetupWizardScreenState extends State<SetupWizardScreen> {
                     ),
                     _CompletionPage(
                       userName: _userName,
-                      avatarColor: _avatarColors[_avatarColorIndex],
+                      avatarColor: UserAvatarColors.getColor(_avatarColorIndex),
                       emailConfigured: _emailConfigured,
                       contactsCount: _familyContacts.length,
                       onComplete: _completeSetup,
@@ -197,11 +195,15 @@ class _ProgressIndicator extends StatelessWidget {
   }
 }
 
-/// Pagina 1: Benvenuto
+/// Pagina 1: Benvenuto (personalizzato con nome utente)
 class _WelcomePage extends StatelessWidget {
+  final String userName;
   final VoidCallback onNext;
 
-  const _WelcomePage({required this.onNext});
+  const _WelcomePage({
+    required this.userName,
+    required this.onNext,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -219,7 +221,7 @@ class _WelcomePage extends StatelessWidget {
           const SizedBox(height: 48),
 
           Text(
-            'Benvenuto in OlderOS',
+            userName.isNotEmpty ? 'Ciao $userName!' : 'Benvenuto in OlderOS',
             style: Theme.of(context).textTheme.displayLarge?.copyWith(
               fontWeight: FontWeight.bold,
               color: OlderOSTheme.textPrimary,
@@ -230,7 +232,7 @@ class _WelcomePage extends StatelessWidget {
           const SizedBox(height: 24),
 
           Text(
-            'Il computer semplice pensato per te.\nConfiguriamo insieme il tuo dispositivo.',
+            'Configuriamo insieme il tuo dispositivo.\nAggiungi email e contatti per iniziare.',
             style: Theme.of(context).textTheme.headlineSmall?.copyWith(
               color: OlderOSTheme.textSecondary,
             ),
@@ -250,189 +252,7 @@ class _WelcomePage extends StatelessWidget {
   }
 }
 
-/// Pagina 2: Nome utente
-class _UserNamePage extends StatefulWidget {
-  final String userName;
-  final int avatarColorIndex;
-  final List<Color> avatarColors;
-  final ValueChanged<String> onUserNameChanged;
-  final ValueChanged<int> onAvatarColorChanged;
-  final VoidCallback onNext;
-  final VoidCallback onBack;
-
-  const _UserNamePage({
-    required this.userName,
-    required this.avatarColorIndex,
-    required this.avatarColors,
-    required this.onUserNameChanged,
-    required this.onAvatarColorChanged,
-    required this.onNext,
-    required this.onBack,
-  });
-
-  @override
-  State<_UserNamePage> createState() => _UserNamePageState();
-}
-
-class _UserNamePageState extends State<_UserNamePage> {
-  late TextEditingController _controller;
-
-  @override
-  void initState() {
-    super.initState();
-    _controller = TextEditingController(text: widget.userName);
-  }
-
-  @override
-  void dispose() {
-    _controller.dispose();
-    super.dispose();
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final avatarColor = widget.avatarColors[widget.avatarColorIndex];
-    final initial = widget.userName.isNotEmpty ? widget.userName[0].toUpperCase() : '?';
-
-    return SingleChildScrollView(
-      padding: const EdgeInsets.all(OlderOSTheme.marginScreen),
-      child: Column(
-        children: [
-          const SizedBox(height: 20),
-
-          Text(
-            'Come ti chiami?',
-            style: Theme.of(context).textTheme.displayMedium?.copyWith(
-              fontWeight: FontWeight.bold,
-            ),
-          ),
-
-          const SizedBox(height: 40),
-
-          // Avatar preview
-          Container(
-            width: 140,
-            height: 140,
-            decoration: BoxDecoration(
-              color: avatarColor,
-              shape: BoxShape.circle,
-              boxShadow: [
-                BoxShadow(
-                  color: avatarColor.withAlpha(100),
-                  blurRadius: 20,
-                  offset: const Offset(0, 8),
-                ),
-              ],
-            ),
-            child: Center(
-              child: Text(
-                initial,
-                style: const TextStyle(
-                  color: Colors.white,
-                  fontSize: 72,
-                  fontWeight: FontWeight.bold,
-                ),
-              ),
-            ),
-          ),
-
-          const SizedBox(height: 32),
-
-          // Selezione colore
-          Wrap(
-            spacing: 12,
-            runSpacing: 12,
-            alignment: WrapAlignment.center,
-            children: List.generate(widget.avatarColors.length, (index) {
-              final isSelected = index == widget.avatarColorIndex;
-              return GestureDetector(
-                onTap: () => widget.onAvatarColorChanged(index),
-                child: Container(
-                  width: 50,
-                  height: 50,
-                  decoration: BoxDecoration(
-                    color: widget.avatarColors[index],
-                    shape: BoxShape.circle,
-                    border: Border.all(
-                      color: isSelected ? Colors.white : Colors.transparent,
-                      width: 4,
-                    ),
-                    boxShadow: isSelected
-                        ? [
-                            BoxShadow(
-                              color: widget.avatarColors[index].withAlpha(150),
-                              blurRadius: 12,
-                            ),
-                          ]
-                        : null,
-                  ),
-                  child: isSelected
-                      ? const Icon(Icons.check, color: Colors.white, size: 28)
-                      : null,
-                ),
-              );
-            }),
-          ),
-
-          const SizedBox(height: 40),
-
-          // Campo nome
-          Container(
-            constraints: const BoxConstraints(maxWidth: 500),
-            child: TextField(
-              controller: _controller,
-              style: const TextStyle(fontSize: 28),
-              textAlign: TextAlign.center,
-              textCapitalization: TextCapitalization.words,
-              decoration: InputDecoration(
-                hintText: 'Il tuo nome',
-                hintStyle: TextStyle(
-                  color: OlderOSTheme.textSecondary.withAlpha(128),
-                  fontSize: 28,
-                ),
-                filled: true,
-                fillColor: OlderOSTheme.cardBackground,
-                border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(16),
-                  borderSide: BorderSide.none,
-                ),
-                contentPadding: const EdgeInsets.symmetric(
-                  horizontal: 24,
-                  vertical: 20,
-                ),
-              ),
-              onChanged: widget.onUserNameChanged,
-            ),
-          ),
-
-          const SizedBox(height: 48),
-
-          // Bottoni navigazione
-          Row(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              _WizardNavButton(
-                label: 'INDIETRO',
-                icon: Icons.arrow_back,
-                isSecondary: true,
-                onTap: widget.onBack,
-              ),
-              const SizedBox(width: 24),
-              _BigWizardButton(
-                label: 'AVANTI',
-                icon: Icons.arrow_forward,
-                enabled: widget.userName.trim().isNotEmpty,
-                onTap: widget.onNext,
-              ),
-            ],
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-/// Pagina 3: Configurazione Email
+/// Pagina 2: Configurazione Email
 class _EmailSetupPage extends StatelessWidget {
   final bool emailConfigured;
   final ValueChanged<bool> onEmailConfigured;
@@ -551,7 +371,7 @@ class _EmailSetupPage extends StatelessWidget {
   }
 }
 
-/// Pagina 4: Contatti familiari
+/// Pagina 3: Contatti familiari
 class _FamilyContactsPage extends StatefulWidget {
   final List<_FamilyContact> contacts;
   final VoidCallback onContactsChanged;
@@ -675,7 +495,7 @@ class _FamilyContactsPageState extends State<_FamilyContactsPage> {
   }
 }
 
-/// Pagina 5: Completamento
+/// Pagina 4: Completamento
 class _CompletionPage extends StatelessWidget {
   final String userName;
   final Color avatarColor;
