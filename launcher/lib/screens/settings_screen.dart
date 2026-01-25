@@ -1075,7 +1075,7 @@ class _WifiDialog extends StatefulWidget {
   final String currentNetwork;
   final List<WifiNetwork> networks;
   final Function(String ssid, String? password) onConnect;
-  final VoidCallback onRefresh;
+  final Future<void> Function() onRefresh;
 
   const _WifiDialog({
     required this.currentNetwork,
