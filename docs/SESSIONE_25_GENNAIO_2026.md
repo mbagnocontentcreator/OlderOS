@@ -245,7 +245,7 @@ error • This expression has a type of 'void' so its value can't be used
 
 **Problema**: Lo splash screen Flutter non appare perché il motore Flutter impiega tempo per inizializzarsi (20 sec su VM).
 
-**Soluzione**: Implementato splash screen nativo che appare PRIMA di Flutter:
+**Soluzione tentata**: Implementato splash screen nativo che appare PRIMA di Flutter:
 - `show_splash.sh` - Mostra immagine con `feh` o `display`
 - `hide_splash.sh` - Nasconde lo splash (chiamato da Flutter dopo primo frame)
 - `create_splash.sh` - Genera l'immagine splash con ImageMagick
@@ -261,6 +261,13 @@ error • This expression has a type of 'void' so its value can't be used
 - `lib/main.dart` - Chiama hide_splash dopo primo frame
 - `system/update/update-olderos.sh` - Installa file splash
 - `system/update/maintenance-mode.sh` - Usa splash nel kiosk autostart
+
+**Risultato su VM**: Lo splash nativo non funziona sulla VM (schermata nera persiste). Possibili cause:
+- Grafica virtualizzata non compatibile con `feh`
+- Timing del kiosk mode
+- Limitazioni della VM UTM
+
+**Da testare su hardware reale** per verificare se lo splash funziona con hardware nativo.
 
 ## Deploy su Hardware Reale
 
