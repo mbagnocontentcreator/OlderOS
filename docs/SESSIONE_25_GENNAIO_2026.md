@@ -195,9 +195,23 @@ Creato nuovo servizio `SystemService` per interagire con il sistema Linux:
 
 ```
 64be121 Implement system integration and UX improvements
+48e1ee2 Add session notes for January 25, 2026
+09a4f1f Fix async callback type in WiFi dialog
 ```
 
-**13 file modificati**, 1591 righe aggiunte, 70 rimosse.
+### Fix CI Build
+
+**Problema**: La build GitHub Actions falliva con errore:
+```
+error • This expression has a type of 'void' so its value can't be used
+       • lib/screens/settings_screen.dart:1096:11 • use_of_void_result
+```
+
+**Causa**: Il callback `onRefresh` nel dialog WiFi era dichiarato come `VoidCallback` ma veniva usato con `await`.
+
+**Soluzione**: Cambiato il tipo da `VoidCallback` a `Future<void> Function()` in `_WifiDialog`.
+
+**File modificato**: `lib/screens/settings_screen.dart`
 
 ## Prossima sessione
 - Implementazione funzionalità "Chiedi aiuto a distanza" (richiede scelta tecnologia: RustDesk, VNC, etc.)
