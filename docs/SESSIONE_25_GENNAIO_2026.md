@@ -197,7 +197,20 @@ Creato nuovo servizio `SystemService` per interagire con il sistema Linux:
 64be121 Implement system integration and UX improvements
 48e1ee2 Add session notes for January 25, 2026
 09a4f1f Fix async callback type in WiFi dialog
+9ffc602 Fix browser offline error screen with connection pre-check
 ```
+
+### Fix Browser Offline (Post-test VM)
+
+**Problema**: Su Linux, `onWebResourceError` non veniva chiamato quando non c'era connessione, mostrando solo una schermata grigia.
+
+**Soluzione**:
+- Aggiunto controllo connessione PRIMA di caricare il webview (non affidandosi al callback di errore)
+- Aggiunta schermata di caricamento "Controllo connessione..."
+- Fix null safety per `WebViewController?`
+- Il retry funziona anche se il controller non era stato inizializzato
+
+**File modificato**: `lib/screens/webview_screen.dart`
 
 ### Fix CI Build
 
