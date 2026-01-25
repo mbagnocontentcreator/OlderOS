@@ -198,6 +198,8 @@ Creato nuovo servizio `SystemService` per interagire con il sistema Linux:
 48e1ee2 Add session notes for January 25, 2026
 09a4f1f Fix async callback type in WiFi dialog
 9ffc602 Fix browser offline error screen with connection pre-check
+f63e902 Update session notes with browser offline fix
+66dd2d6 Add native splash screen for Linux startup
 ```
 
 ### Fix Browser Offline (Post-test VM)
@@ -235,12 +237,52 @@ error • This expression has a type of 'void' so its value can't be used
 | Browser offline | ✅ | Mostra errore e permette di tornare alla home |
 | WiFi | ⚠️ | Non trova reti (normale: VM senza scheda wireless) |
 | Luminosità/Volume | ⚠️ | Non funzionano (normale: hardware virtualizzato) |
-| Splash screen | ❌ | 20 sec di schermo nero prima del login (da investigare) |
+| Splash screen | ⚠️ | Implementato splash nativo (vedi sotto) |
 
 **Nota**: WiFi, luminosità e volume dovrebbero funzionare su hardware reale con NetworkManager e PulseAudio/PipeWire.
 
+### Splash Screen Nativo
+
+**Problema**: Lo splash screen Flutter non appare perché il motore Flutter impiega tempo per inizializzarsi (20 sec su VM).
+
+**Soluzione**: Implementato splash screen nativo che appare PRIMA di Flutter:
+- `show_splash.sh` - Mostra immagine con `feh` o `display`
+- `hide_splash.sh` - Nasconde lo splash (chiamato da Flutter dopo primo frame)
+- `create_splash.sh` - Genera l'immagine splash con ImageMagick
+- `start_olderos.sh` - Wrapper che avvia splash + app
+
+**Requisiti su Linux**:
+- `feh` o ImageMagick per visualizzare lo splash
+- ImageMagick per generare l'immagine splash
+
+**File creati**: `launcher/linux/splash/`
+
+**File modificati**:
+- `lib/main.dart` - Chiama hide_splash dopo primo frame
+- `system/update/update-olderos.sh` - Installa file splash
+- `system/update/maintenance-mode.sh` - Usa splash nel kiosk autostart
+
+## Deploy su Hardware Reale
+
+Il sistema è pronto per essere testato su hardware reale. Gli aggiornamenti continueranno a funzionare esattamente come sulla VM:
+
+1. Accesso TTY: `Ctrl+Alt+F2`
+2. Login con utente
+3. Aggiorna: `~/OlderOS/system/update/update-olderos.sh`
+4. Riavvia
+
+**Vantaggi su hardware reale**:
+- WiFi, luminosità e volume funzioneranno
+- Splash screen più veloce
+- Performance migliori
+
+**Requisiti**:
+- Ubuntu con X11 + Openbox configurato in kiosk mode
+- NetworkManager per WiFi
+- PulseAudio o PipeWire per audio
+- Connessione Internet per aggiornamenti da GitHub
+
 ## Prossima sessione
-- Investigare problema splash screen (schermo nero all'avvio)
-- Test su hardware reale (non più VM)
+- Test su hardware reale
 - Implementazione funzionalità "Chiedi aiuto a distanza" (richiede scelta tecnologia: RustDesk, VNC, etc.)
 - Preparazione per creazione ISO
