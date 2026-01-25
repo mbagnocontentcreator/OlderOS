@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import '../theme/olderos_theme.dart';
 import '../widgets/top_bar.dart';
+import '../widgets/context_menu_region.dart';
 
 class Document {
   String title;
@@ -365,6 +366,7 @@ class _WriterScreenState extends State<WriterScreen> {
                 border: InputBorder.none,
               ),
               onChanged: (_) => _onContentChanged(),
+              contextMenuBuilder: OlderOSContextMenuBuilder.buildContextMenu,
             ),
           ),
         ),

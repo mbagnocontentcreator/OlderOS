@@ -47,7 +47,9 @@ class _EmailSetupScreenState extends State<EmailSetupScreen> {
     if (!_emailService.isGoogleOAuthConfigured) {
       setState(() {
         _isLoading = false;
-        _error = 'L\'accesso rapido Google non è disponibile.\nUsa la configurazione manuale qui sotto inserendo email e password.';
+        // Mostra automaticamente il form manuale con un messaggio informativo
+        _showManualForm = true;
+        _error = 'L\'accesso rapido Google non è disponibile su questo dispositivo.\nInserisci i dati del tuo account qui sotto.';
       });
       return;
     }
@@ -62,7 +64,11 @@ class _EmailSetupScreenState extends State<EmailSetupScreen> {
         Navigator.of(context).pop(true);
       }
     } else {
-      setState(() => _error = error);
+      // Se OAuth fallisce, mostra automaticamente il form manuale
+      setState(() {
+        _showManualForm = true;
+        _error = error;
+      });
     }
   }
 

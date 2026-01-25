@@ -5,6 +5,7 @@ import '../widgets/user_avatar.dart';
 import '../services/email_service.dart';
 import '../services/first_run_service.dart';
 import '../services/user_service.dart';
+import '../services/system_service.dart';
 import 'user_setup_screen.dart';
 
 class SettingsScreen extends StatefulWidget {
@@ -15,10 +16,73 @@ class SettingsScreen extends StatefulWidget {
 }
 
 class _SettingsScreenState extends State<SettingsScreen> {
+  final _systemService = SystemService();
+
   double _brightness = 0.8;
   double _volume = 0.6;
-  String _connectedWifi = 'Casa_Mario';
-  String _connectedPrinter = 'HP DeskJet 2700';
+  String _connectedWifi = '';
+  String _connectedPrinter = '';
+  bool _isWifiConnected = false;
+  bool _isPrinterReady = false;
+  List<WifiNetwork> _wifiNetworks = [];
+  List<Printer> _printers = [];
+  bool _isLoadingSettings = true;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadSystemSettings();
+  }
+
+  Future<void> _loadSystemSettings() async {
+    setState(() => _isLoadingSettings = true);
+
+    try {
+      // Carica luminosità
+      final brightness = await _systemService.getBrightness();
+      // Carica volume
+      final volume = await _systemService.getVolume();
+      // Carica reti WiFi
+      final wifiNetworks = await _systemService.getWifiNetworks();
+      // Carica stampanti
+      final printers = await _systemService.getPrinters();
+
+      if (mounted) {
+        setState(() {
+          _brightness = brightness;
+          _volume = volume;
+          _wifiNetworks = wifiNetworks;
+          _printers = printers;
+
+          // Trova rete connessa
+          final connectedNetwork = wifiNetworks.where((n) => n.isConnected).firstOrNull;
+          _connectedWifi = connectedNetwork?.ssid ?? 'Non connesso';
+          _isWifiConnected = connectedNetwork != null;
+
+          // Trova stampante predefinita
+          final defaultPrinter = printers.where((p) => p.isDefault).firstOrNull;
+          _connectedPrinter = defaultPrinter?.name ?? 'Nessuna stampante';
+          _isPrinterReady = defaultPrinter != null && defaultPrinter.status == 'Pronta';
+
+          _isLoadingSettings = false;
+        });
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() => _isLoadingSettings = false);
+      }
+    }
+  }
+
+  Future<void> _onBrightnessChanged(double value) async {
+    setState(() => _brightness = value);
+    await _systemService.setBrightness(value);
+  }
+
+  Future<void> _onVolumeChanged(double value) async {
+    setState(() => _volume = value);
+    await _systemService.setVolume(value);
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -42,7 +106,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                     title: 'LUMINOSITA SCHERMO',
                     child: _BrightnessSlider(
                       value: _brightness,
-                      onChanged: (value) => setState(() => _brightness = value),
+                      onChanged: _onBrightnessChanged,
                     ),
                   ),
 
@@ -55,7 +119,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                     title: 'VOLUME SUONI',
                     child: _VolumeSlider(
                       value: _volume,
-                      onChanged: (value) => setState(() => _volume = value),
+                      onChanged: _onVolumeChanged,
                     ),
                   ),
 
@@ -67,8 +131,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
                     iconColor: OlderOSTheme.success,
                     title: 'RETE WIFI',
                     trailing: _StatusBadge(
-                      label: 'Connesso',
-                      color: OlderOSTheme.success,
+                      label: _isWifiConnected ? 'Connesso' : 'Non connesso',
+                      color: _isWifiConnected ? OlderOSTheme.success : OlderOSTheme.warning,
                     ),
                     child: _WifiSection(
                       connectedNetwork: _connectedWifi,
@@ -84,8 +148,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
                     iconColor: OlderOSTheme.videoCallColor,
                     title: 'STAMPANTE',
                     trailing: _StatusBadge(
-                      label: 'Pronta',
-                      color: OlderOSTheme.success,
+                      label: _isPrinterReady ? 'Pronta' : 'Non disponibile',
+                      color: _isPrinterReady ? OlderOSTheme.success : OlderOSTheme.warning,
                     ),
                     child: _PrinterSection(
                       connectedPrinter: _connectedPrinter,
@@ -244,11 +308,79 @@ class _SettingsScreenState extends State<SettingsScreen> {
       context: context,
       builder: (context) => _WifiDialog(
         currentNetwork: _connectedWifi,
-        onConnect: (network) {
-          setState(() => _connectedWifi = network);
+        networks: _wifiNetworks,
+        onConnect: (network, password) async {
           Navigator.of(context).pop();
-          _showConnectionSuccess(network);
+
+          // Mostra indicatore di connessione
+          _showConnectingDialog(network);
+
+          // Tenta la connessione
+          final success = await _systemService.connectToWifi(network, password);
+
+          // Chiudi il dialogo di connessione
+          if (mounted) Navigator.of(context).pop();
+
+          if (success) {
+            await _loadSystemSettings(); // Ricarica le impostazioni
+            _showConnectionSuccess(network);
+          } else {
+            _showConnectionError(network);
+          }
         },
+        onRefresh: () async {
+          final networks = await _systemService.getWifiNetworks();
+          setState(() => _wifiNetworks = networks);
+        },
+      ),
+    );
+  }
+
+  void _showConnectingDialog(String network) {
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (context) => AlertDialog(
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(OlderOSTheme.borderRadiusCard),
+        ),
+        content: Padding(
+          padding: const EdgeInsets.all(24),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const CircularProgressIndicator(color: OlderOSTheme.primary),
+              const SizedBox(height: 24),
+              Text(
+                'Connessione a $network...',
+                style: const TextStyle(fontSize: 20),
+                textAlign: TextAlign.center,
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  void _showConnectionError(String network) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Row(
+          children: [
+            const Icon(Icons.error, color: Colors.white, size: 28),
+            const SizedBox(width: 12),
+            Text(
+              'Impossibile connettersi a $network',
+              style: const TextStyle(fontSize: 20),
+            ),
+          ],
+        ),
+        backgroundColor: OlderOSTheme.danger,
+        duration: const Duration(seconds: 3),
+        behavior: SnackBarBehavior.floating,
+        margin: const EdgeInsets.all(16),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
       ),
     );
   }
@@ -939,24 +1071,99 @@ class _ActionButtonState extends State<_ActionButton> {
   }
 }
 
-class _WifiDialog extends StatelessWidget {
+class _WifiDialog extends StatefulWidget {
   final String currentNetwork;
-  final ValueChanged<String> onConnect;
+  final List<WifiNetwork> networks;
+  final Function(String ssid, String? password) onConnect;
+  final VoidCallback onRefresh;
 
   const _WifiDialog({
     required this.currentNetwork,
+    required this.networks,
     required this.onConnect,
+    required this.onRefresh,
   });
 
   @override
-  Widget build(BuildContext context) {
-    final networks = [
-      'Casa_Mario',
-      'Vicino_WiFi',
-      'TIM-28374',
-      'Vodafone-A83B',
-    ];
+  State<_WifiDialog> createState() => _WifiDialogState();
+}
 
+class _WifiDialogState extends State<_WifiDialog> {
+  bool _isRefreshing = false;
+
+  Future<void> _refresh() async {
+    setState(() => _isRefreshing = true);
+    await widget.onRefresh();
+    setState(() => _isRefreshing = false);
+  }
+
+  void _onNetworkTap(WifiNetwork network) {
+    if (network.isConnected) {
+      // Gia' connesso, non fare nulla
+      return;
+    }
+
+    if (network.isSecured) {
+      // Mostra dialog per password
+      _showPasswordDialog(network.ssid);
+    } else {
+      // Connetti direttamente
+      widget.onConnect(network.ssid, null);
+    }
+  }
+
+  void _showPasswordDialog(String ssid) {
+    final passwordController = TextEditingController();
+
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(20),
+        ),
+        title: Row(
+          children: [
+            const Icon(Icons.lock, color: OlderOSTheme.primary, size: 32),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Text(
+                'Password per $ssid',
+                style: const TextStyle(fontSize: 20),
+              ),
+            ),
+          ],
+        ),
+        content: TextField(
+          controller: passwordController,
+          obscureText: true,
+          style: const TextStyle(fontSize: 20),
+          decoration: InputDecoration(
+            labelText: 'Password WiFi',
+            labelStyle: const TextStyle(fontSize: 18),
+            border: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(12),
+            ),
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(),
+            child: const Text('ANNULLA', style: TextStyle(fontSize: 18)),
+          ),
+          ElevatedButton(
+            onPressed: () {
+              Navigator.of(ctx).pop();
+              widget.onConnect(ssid, passwordController.text);
+            },
+            child: const Text('CONNETTI', style: TextStyle(fontSize: 18)),
+          ),
+        ],
+      ),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
     return AlertDialog(
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(OlderOSTheme.borderRadiusCard),
@@ -965,34 +1172,55 @@ class _WifiDialog extends StatelessWidget {
         children: [
           Icon(Icons.wifi, size: 32, color: OlderOSTheme.success),
           const SizedBox(width: 12),
-          Text(
-            'Scegli rete WiFi',
-            style: Theme.of(context).textTheme.displayMedium,
+          Expanded(
+            child: Text(
+              'Scegli rete WiFi',
+              style: Theme.of(context).textTheme.displayMedium,
+            ),
+          ),
+          IconButton(
+            onPressed: _isRefreshing ? null : _refresh,
+            icon: _isRefreshing
+                ? const SizedBox(
+                    width: 24,
+                    height: 24,
+                    child: CircularProgressIndicator(strokeWidth: 2),
+                  )
+                : const Icon(Icons.refresh),
+            tooltip: 'Aggiorna',
           ),
         ],
       ),
       content: SizedBox(
         width: 400,
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: networks.map((network) {
-            final isConnected = network == currentNetwork;
-            return Padding(
-              padding: const EdgeInsets.only(bottom: 8),
-              child: _WifiNetworkTile(
-                name: network,
-                isConnected: isConnected,
-                onTap: () => onConnect(network),
+        child: widget.networks.isEmpty
+            ? const Padding(
+                padding: EdgeInsets.all(24),
+                child: Text(
+                  'Nessuna rete WiFi trovata',
+                  style: TextStyle(fontSize: 18),
+                  textAlign: TextAlign.center,
+                ),
+              )
+            : Column(
+                mainAxisSize: MainAxisSize.min,
+                children: widget.networks.take(6).map((network) {
+                  return Padding(
+                    padding: const EdgeInsets.only(bottom: 8),
+                    child: _WifiNetworkTile(
+                      network: network,
+                      isConnected: network.isConnected,
+                      onTap: () => _onNetworkTap(network),
+                    ),
+                  );
+                }).toList(),
               ),
-            );
-          }).toList(),
-        ),
       ),
       actions: [
         TextButton(
           onPressed: () => Navigator.of(context).pop(),
           child: Text(
-            'Annulla',
+            'Chiudi',
             style: TextStyle(
               fontSize: 20,
               color: OlderOSTheme.textSecondary,
@@ -1005,12 +1233,12 @@ class _WifiDialog extends StatelessWidget {
 }
 
 class _WifiNetworkTile extends StatefulWidget {
-  final String name;
+  final WifiNetwork network;
   final bool isConnected;
   final VoidCallback onTap;
 
   const _WifiNetworkTile({
-    required this.name,
+    required this.network,
     required this.isConnected,
     required this.onTap,
   });
@@ -1021,6 +1249,14 @@ class _WifiNetworkTile extends StatefulWidget {
 
 class _WifiNetworkTileState extends State<_WifiNetworkTile> {
   bool _isHovered = false;
+
+  IconData _getSignalIcon() {
+    final strength = widget.network.signalStrength;
+    if (strength >= 75) return Icons.signal_wifi_4_bar;
+    if (strength >= 50) return Icons.network_wifi_3_bar;
+    if (strength >= 25) return Icons.network_wifi_2_bar;
+    return Icons.network_wifi_1_bar;
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -1046,7 +1282,7 @@ class _WifiNetworkTileState extends State<_WifiNetworkTile> {
           child: Row(
             children: [
               Icon(
-                Icons.wifi,
+                _getSignalIcon(),
                 size: 28,
                 color: widget.isConnected
                     ? OlderOSTheme.success
@@ -1054,16 +1290,37 @@ class _WifiNetworkTileState extends State<_WifiNetworkTile> {
               ),
               const SizedBox(width: 16),
               Expanded(
-                child: Text(
-                  widget.name,
-                  style: TextStyle(
-                    fontSize: 20,
-                    fontWeight: widget.isConnected
-                        ? FontWeight.bold
-                        : FontWeight.normal,
-                  ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      widget.network.ssid,
+                      style: TextStyle(
+                        fontSize: 20,
+                        fontWeight: widget.isConnected
+                            ? FontWeight.bold
+                            : FontWeight.normal,
+                      ),
+                    ),
+                    Text(
+                      '${widget.network.signalStrength}% - ${widget.network.isSecured ? "Protetta" : "Aperta"}',
+                      style: TextStyle(
+                        fontSize: 14,
+                        color: OlderOSTheme.textSecondary,
+                      ),
+                    ),
+                  ],
                 ),
               ),
+              if (widget.network.isSecured)
+                Padding(
+                  padding: const EdgeInsets.only(right: 8),
+                  child: Icon(
+                    Icons.lock,
+                    size: 20,
+                    color: OlderOSTheme.textSecondary,
+                  ),
+                ),
               if (widget.isConnected)
                 Icon(
                   Icons.check_circle,

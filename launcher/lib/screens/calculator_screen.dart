@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'dart:math';
 import '../theme/olderos_theme.dart';
 import '../widgets/top_bar.dart';
@@ -16,6 +17,82 @@ class _CalculatorScreenState extends State<CalculatorScreen> {
   double? _firstNumber;
   String? _operation;
   bool _shouldResetDisplay = false;
+
+  final _focusNode = FocusNode();
+
+  @override
+  void initState() {
+    super.initState();
+    // Richiedi il focus all'avvio per ricevere input da tastiera
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _focusNode.requestFocus();
+    });
+  }
+
+  @override
+  void dispose() {
+    _focusNode.dispose();
+    super.dispose();
+  }
+
+  void _handleKeyPress(KeyEvent event) {
+    if (event is! KeyDownEvent) return;
+
+    final key = event.logicalKey;
+
+    // Numeri 0-9 (riga superiore e numpad)
+    if (key == LogicalKeyboardKey.digit0 || key == LogicalKeyboardKey.numpad0) {
+      _onDigitPressed('0');
+    } else if (key == LogicalKeyboardKey.digit1 || key == LogicalKeyboardKey.numpad1) {
+      _onDigitPressed('1');
+    } else if (key == LogicalKeyboardKey.digit2 || key == LogicalKeyboardKey.numpad2) {
+      _onDigitPressed('2');
+    } else if (key == LogicalKeyboardKey.digit3 || key == LogicalKeyboardKey.numpad3) {
+      _onDigitPressed('3');
+    } else if (key == LogicalKeyboardKey.digit4 || key == LogicalKeyboardKey.numpad4) {
+      _onDigitPressed('4');
+    } else if (key == LogicalKeyboardKey.digit5 || key == LogicalKeyboardKey.numpad5) {
+      _onDigitPressed('5');
+    } else if (key == LogicalKeyboardKey.digit6 || key == LogicalKeyboardKey.numpad6) {
+      _onDigitPressed('6');
+    } else if (key == LogicalKeyboardKey.digit7 || key == LogicalKeyboardKey.numpad7) {
+      _onDigitPressed('7');
+    } else if (key == LogicalKeyboardKey.digit8 || key == LogicalKeyboardKey.numpad8) {
+      _onDigitPressed('8');
+    } else if (key == LogicalKeyboardKey.digit9 || key == LogicalKeyboardKey.numpad9) {
+      _onDigitPressed('9');
+    }
+    // Operatori
+    else if (key == LogicalKeyboardKey.add || key == LogicalKeyboardKey.numpadAdd) {
+      _onOperationPressed('+');
+    } else if (key == LogicalKeyboardKey.minus || key == LogicalKeyboardKey.numpadSubtract) {
+      _onOperationPressed('-');
+    } else if (key == LogicalKeyboardKey.asterisk || key == LogicalKeyboardKey.numpadMultiply) {
+      _onOperationPressed('×');
+    } else if (key == LogicalKeyboardKey.slash || key == LogicalKeyboardKey.numpadDivide) {
+      _onOperationPressed('÷');
+    }
+    // Uguale (Enter, =)
+    else if (key == LogicalKeyboardKey.enter || key == LogicalKeyboardKey.numpadEnter || key == LogicalKeyboardKey.equal) {
+      _onEqualsPressed();
+    }
+    // Decimale (virgola o punto)
+    else if (key == LogicalKeyboardKey.comma || key == LogicalKeyboardKey.period || key == LogicalKeyboardKey.numpadDecimal) {
+      _onDecimalPressed();
+    }
+    // Cancella (Backspace)
+    else if (key == LogicalKeyboardKey.backspace) {
+      _onBackspacePressed();
+    }
+    // Clear (C, Escape, Delete)
+    else if (key == LogicalKeyboardKey.keyC || key == LogicalKeyboardKey.escape || key == LogicalKeyboardKey.delete) {
+      _onClearPressed();
+    }
+    // Percentuale (% - richiede Shift+5 su tastiere italiane)
+    else if (key == LogicalKeyboardKey.percent) {
+      _onPercentPressed();
+    }
+  }
 
   void _onDigitPressed(String digit) {
     setState(() {
@@ -155,16 +232,20 @@ class _CalculatorScreenState extends State<CalculatorScreen> {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      body: SafeArea(
-        child: Column(
-          children: [
-            TopBar(
-              title: 'CALCOLA',
-              onGoHome: () => Navigator.of(context).pop(),
-            ),
+    return KeyboardListener(
+      focusNode: _focusNode,
+      autofocus: true,
+      onKeyEvent: _handleKeyPress,
+      child: Scaffold(
+        body: SafeArea(
+          child: Column(
+            children: [
+              TopBar(
+                title: 'CALCOLA',
+                onGoHome: () => Navigator.of(context).pop(),
+              ),
 
-            Expanded(
+              Expanded(
               child: Padding(
                 padding: const EdgeInsets.all(OlderOSTheme.marginScreen),
                 child: Column(
@@ -340,6 +421,7 @@ class _CalculatorScreenState extends State<CalculatorScreen> {
             ),
           ],
         ),
+      ),
       ),
     );
   }

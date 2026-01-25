@@ -1,3 +1,4 @@
+import 'dart:io' show Platform;
 import 'package:flutter/material.dart';
 
 class OlderOSTheme {
@@ -34,12 +35,32 @@ class OlderOSTheme {
   static const double appCardSize = 200.0;
   static const double iconSize = 64.0;
 
-  static const String _fontFamily = '.SF Pro Text';
+  // Font cross-platform: Ubuntu su Linux, SF Pro su macOS
+  static String get _fontFamily {
+    if (Platform.isLinux) {
+      return 'Ubuntu';
+    } else if (Platform.isMacOS) {
+      return '.SF Pro Text';
+    }
+    return 'Roboto';
+  }
+
+  // Font fallback per garantire compatibilità cross-platform
+  static const List<String> _fontFallback = [
+    'Ubuntu',
+    'Roboto',
+    'DejaVu Sans',
+    'Liberation Sans',
+    'sans-serif',
+  ];
 
   static ThemeData get theme {
+    final font = _fontFamily;
+
     return ThemeData(
       useMaterial3: true,
-      fontFamily: _fontFamily,
+      fontFamily: font,
+      fontFamilyFallback: _fontFallback,
       colorScheme: ColorScheme.light(
         surface: background,
         primary: primary,
@@ -48,36 +69,48 @@ class OlderOSTheme {
         error: danger,
       ),
       scaffoldBackgroundColor: background,
-      textTheme: const TextTheme(
+      textTheme: TextTheme(
         displayLarge: TextStyle(
           fontSize: 32,
           fontWeight: FontWeight.bold,
           color: textPrimary,
+          fontFamily: font,
+          fontFamilyFallback: _fontFallback,
         ),
         displayMedium: TextStyle(
           fontSize: 28,
           fontWeight: FontWeight.w600,
           color: textPrimary,
+          fontFamily: font,
+          fontFamilyFallback: _fontFallback,
         ),
         titleLarge: TextStyle(
           fontSize: 24,
           fontWeight: FontWeight.w500,
           color: textPrimary,
+          fontFamily: font,
+          fontFamilyFallback: _fontFallback,
         ),
         titleMedium: TextStyle(
           fontSize: 22,
           fontWeight: FontWeight.w500,
           color: textPrimary,
+          fontFamily: font,
+          fontFamilyFallback: _fontFallback,
         ),
         bodyLarge: TextStyle(
           fontSize: 24,
           fontWeight: FontWeight.normal,
           color: textPrimary,
+          fontFamily: font,
+          fontFamilyFallback: _fontFallback,
         ),
         bodyMedium: TextStyle(
           fontSize: 20,
           fontWeight: FontWeight.normal,
           color: textSecondary,
+          fontFamily: font,
+          fontFamilyFallback: _fontFallback,
         ),
       ),
       elevatedButtonTheme: ElevatedButtonThemeData(

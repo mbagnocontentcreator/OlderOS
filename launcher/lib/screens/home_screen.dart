@@ -7,6 +7,7 @@ import '../widgets/big_button.dart';
 import '../widgets/user_avatar.dart';
 import '../services/first_run_service.dart';
 import '../services/user_service.dart';
+import '../services/system_service.dart';
 import 'browser_screen.dart';
 import 'photos_screen.dart';
 import 'writer_screen.dart';
@@ -316,6 +317,12 @@ class _HomeScreenState extends State<HomeScreen> {
         ),
       ),
     );
+
+    // Esegue lo spegnimento reale dopo un breve ritardo
+    Future.delayed(const Duration(seconds: 2), () async {
+      final systemService = SystemService();
+      await systemService.shutdown();
+    });
   }
 
   @override

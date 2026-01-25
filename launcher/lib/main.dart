@@ -12,6 +12,7 @@ import 'services/email_service.dart';
 import 'services/email_accounts_service.dart';
 import 'services/draft_service.dart';
 import 'services/email_notification_service.dart';
+import 'services/file_service.dart';
 import 'widgets/olderos_logo.dart';
 
 void main() {
@@ -57,6 +58,10 @@ class _AppStartupState extends State<_AppStartup> {
   AppStartupState _state = AppStartupState.loading;
   User? _selectedUser;
 
+  // Stato dello splash screen
+  double _loadingProgress = 0.0;
+  String _loadingMessage = 'Avvio in corso...';
+
   @override
   void initState() {
     super.initState();
@@ -64,8 +69,30 @@ class _AppStartupState extends State<_AppStartup> {
   }
 
   Future<void> _initialize() async {
-    // Inizializza il servizio utenti
+    // Step 1: Inizializzazione sistema
+    _updateLoadingState(0.1, 'Inizializzazione sistema...');
+    await Future.delayed(const Duration(milliseconds: 300));
+
+    // Step 2: Caricamento configurazione e cartelle di sistema
+    _updateLoadingState(0.3, 'Caricamento configurazione...');
+    await FileService().initialize();
+    await Future.delayed(const Duration(milliseconds: 200));
+
+    // Step 3: Inizializza il servizio utenti
+    _updateLoadingState(0.5, 'Caricamento profili utente...');
     await _userService.initialize();
+    await Future.delayed(const Duration(milliseconds: 200));
+
+    // Step 4: Preparazione interfaccia
+    _updateLoadingState(0.7, 'Preparazione interfaccia...');
+    await Future.delayed(const Duration(milliseconds: 300));
+
+    // Step 5: Completamento
+    _updateLoadingState(0.9, 'Quasi pronto...');
+    await Future.delayed(const Duration(milliseconds: 200));
+
+    _updateLoadingState(1.0, 'Benvenuto!');
+    await Future.delayed(const Duration(milliseconds: 300));
 
     if (!_userService.hasUsers) {
       // Nessun utente registrato
@@ -82,6 +109,15 @@ class _AppStartupState extends State<_AppStartup> {
       // Piu' utenti - mostra selezione
       setState(() {
         _state = AppStartupState.userSelection;
+      });
+    }
+  }
+
+  void _updateLoadingState(double progress, String message) {
+    if (mounted) {
+      setState(() {
+        _loadingProgress = progress;
+        _loadingMessage = message;
       });
     }
   }
@@ -256,10 +292,34 @@ class _AppStartupState extends State<_AppStartup> {
           child: Column(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              const OlderOSLogo(size: 120, showText: true),
-              const SizedBox(height: 32),
-              CircularProgressIndicator(
-                color: OlderOSTheme.primary,
+              const OlderOSLogo(size: 140, showText: true),
+              const SizedBox(height: 48),
+              // Barra di progresso
+              SizedBox(
+                width: 280,
+                child: Column(
+                  children: [
+                    ClipRRect(
+                      borderRadius: BorderRadius.circular(8),
+                      child: LinearProgressIndicator(
+                        value: _loadingProgress,
+                        minHeight: 12,
+                        backgroundColor: OlderOSTheme.primary.withAlpha(50),
+                        valueColor: AlwaysStoppedAnimation<Color>(
+                          OlderOSTheme.primary,
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 16),
+                    Text(
+                      _loadingMessage,
+                      style: TextStyle(
+                        fontSize: 18,
+                        color: OlderOSTheme.textSecondary,
+                      ),
+                    ),
+                  ],
+                ),
               ),
             ],
           ),
