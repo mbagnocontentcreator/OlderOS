@@ -290,6 +290,23 @@ Il sistema è pronto per essere testato su hardware reale. Gli aggiornamenti con
 - Connessione Internet per aggiornamenti da GitHub
 
 ## Prossima sessione
-- Test su hardware reale
-- Implementazione funzionalità "Chiedi aiuto a distanza" (richiede scelta tecnologia: RustDesk, VNC, etc.)
-- Preparazione per creazione ISO
+
+### Priorità
+1. **Preparazione installazione su hardware reale**
+   - Documentazione setup da zero
+   - Test funzionalità hardware (WiFi, audio, luminosità)
+   - Verifica splash screen nativo
+
+2. **Creazione ISO per distribuzione**
+   - ISO installabile su nuovi PC
+   - Setup automatico kiosk mode
+
+3. **Sistema di aggiornamento automatico (stile Ubuntu)**
+   - Controllo automatico nuove versioni da GitHub
+   - Notifica "Aggiornamento disponibile" nell'app
+   - Aggiornamento con un click (senza terminale)
+   - Versioning e changelog
+   - Riavvio automatico dopo aggiornamento
+
+### Rimandato
+- "Chiedi aiuto a distanza" - Da implementare in futuro
