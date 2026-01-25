@@ -1,3 +1,5 @@
+import 'dart:async';
+import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:webview_flutter/webview_flutter.dart';
 import '../theme/olderos_theme.dart';
@@ -17,21 +19,83 @@ class WebViewScreen extends StatefulWidget {
 }
 
 class _WebViewScreenState extends State<WebViewScreen> {
-  late final WebViewController _controller;
+  WebViewController? _controller;
   bool _isLoading = true;
   bool _canGoBack = false;
   String _currentTitle = '';
   bool _hasError = false;
   String _errorMessage = '';
+  bool _isCheckingConnection = true;
+  Timer? _timeoutTimer;
 
   @override
   void initState() {
     super.initState();
     _currentTitle = widget.title;
+    _checkConnectionAndLoad();
+  }
+
+  @override
+  void dispose() {
+    _timeoutTimer?.cancel();
+    super.dispose();
+  }
+
+  /// Verifica la connessione prima di caricare il webview
+  Future<void> _checkConnectionAndLoad() async {
+    setState(() {
+      _isCheckingConnection = true;
+      _hasError = false;
+    });
+
+    final hasConnection = await _checkInternetConnection();
+
+    if (!mounted) return;
+
+    if (!hasConnection) {
+      setState(() {
+        _isCheckingConnection = false;
+        _hasError = true;
+        _isLoading = false;
+        _errorMessage = 'Non sei connesso a Internet.\nControlla la connessione e riprova.';
+      });
+      return;
+    }
+
+    setState(() {
+      _isCheckingConnection = false;
+    });
+
     _initWebView();
   }
 
+  /// Verifica se c'è connessione Internet
+  Future<bool> _checkInternetConnection() async {
+    try {
+      final result = await InternetAddress.lookup('google.com')
+          .timeout(const Duration(seconds: 5));
+      return result.isNotEmpty && result[0].rawAddress.isNotEmpty;
+    } on SocketException catch (_) {
+      return false;
+    } on TimeoutException catch (_) {
+      return false;
+    } catch (_) {
+      return false;
+    }
+  }
+
   void _initWebView() {
+    // Timeout di 30 secondi per il caricamento
+    _timeoutTimer = Timer(const Duration(seconds: 30), () {
+      if (_isLoading && mounted) {
+        setState(() {
+          _isLoading = false;
+          _hasError = true;
+          _errorMessage = 'Il caricamento sta impiegando troppo tempo.\nRiprova piu\' tardi.';
+        });
+      }
+    });
+
     _controller = WebViewController()
       ..setJavaScriptMode(JavaScriptMode.unrestricted)
       ..setNavigationDelegate(
@@ -43,15 +107,16 @@ class _WebViewScreenState extends State<WebViewScreen> {
             });
           },
           onPageFinished: (url) async {
+            _timeoutTimer?.cancel();
             setState(() => _isLoading = false);
-            final canGoBack = await _controller.canGoBack();
+            final canGoBack = await _controller?.canGoBack() ?? false;
             setState(() => _canGoBack = canGoBack);
           },
           onNavigationRequest: (request) {
             return NavigationDecision.navigate;
           },
           onWebResourceError: (error) {
-            // Gestisci errori di connessione
+            _timeoutTimer?.cancel();
             setState(() {
               _isLoading = false;
               _hasError = true;
@@ -59,7 +124,6 @@ class _WebViewScreenState extends State<WebViewScreen> {
             });
           },
           onHttpError: (error) {
-            // Gestisci errori HTTP (404, 500, ecc.)
             if (error.response?.statusCode == 404) {
               setState(() {
                 _isLoading = false;
@@ -93,16 +157,22 @@ class _WebViewScreenState extends State<WebViewScreen> {
   }
 
   void _retry() {
+    // Se il controller non è stato inizializzato, riprova la connessione
+    if (_controller == null) {
+      _checkConnectionAndLoad();
+      return;
+    }
     setState(() {
       _hasError = false;
       _isLoading = true;
     });
-    _controller.loadRequest(Uri.parse(widget.url));
+    _controller!.loadRequest(Uri.parse(widget.url));
   }
 
   void _goBack() async {
-    if (await _controller.canGoBack()) {
-      await _controller.goBack();
+    if (_controller == null) return;
+    if (await _controller!.canGoBack()) {
+      await _controller!.goBack();
     }
   }
 
@@ -111,7 +181,11 @@ class _WebViewScreenState extends State<WebViewScreen> {
   }
 
   void _goToStart() {
-    _controller.loadRequest(Uri.parse(widget.url));
+    if (_controller == null) {
+      _checkConnectionAndLoad();
+      return;
+    }
+    _controller!.loadRequest(Uri.parse(widget.url));
   }
 
   @override
@@ -129,17 +203,55 @@ class _WebViewScreenState extends State<WebViewScreen> {
             onGoToStart: _goToStart,
           ),
 
-          // WebView o schermata errore
+          // WebView o schermata errore o caricamento
           Expanded(
-            child: _hasError
-                ? _ErrorScreen(
-                    message: _errorMessage,
-                    onRetry: _retry,
-                    onGoHome: _goHome,
-                  )
-                : WebViewWidget(controller: _controller),
+            child: _isCheckingConnection
+                ? _LoadingScreen()
+                : _hasError
+                    ? _ErrorScreen(
+                        message: _errorMessage,
+                        onRetry: _retry,
+                        onGoHome: _goHome,
+                      )
+                    : _controller != null
+                        ? WebViewWidget(controller: _controller!)
+                        : _LoadingScreen(),
           ),
         ],
+      ),
+    );
+  }
+}
+
+/// Schermata di caricamento mentre verifica la connessione
+class _LoadingScreen extends StatelessWidget {
+  const _LoadingScreen();
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      color: OlderOSTheme.background,
+      child: Center(
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            const SizedBox(
+              width: 60,
+              height: 60,
+              child: CircularProgressIndicator(
+                strokeWidth: 5,
+                color: OlderOSTheme.primary,
+              ),
+            ),
+            const SizedBox(height: 24),
+            Text(
+              'Controllo connessione...',
+              style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                color: OlderOSTheme.textSecondary,
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }
