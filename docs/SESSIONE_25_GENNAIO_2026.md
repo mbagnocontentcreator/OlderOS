@@ -226,7 +226,21 @@ error • This expression has a type of 'void' so its value can't be used
 
 **File modificato**: `lib/screens/settings_screen.dart`
 
+## Test su VM (Post-fix)
+
+| Funzionalità | Stato | Note |
+|--------------|-------|------|
+| Spegnimento reale | ✅ | Funziona correttamente |
+| Calcolatrice da tastiera | ✅ | Funziona correttamente |
+| Browser offline | ✅ | Mostra errore e permette di tornare alla home |
+| WiFi | ⚠️ | Non trova reti (normale: VM senza scheda wireless) |
+| Luminosità/Volume | ⚠️ | Non funzionano (normale: hardware virtualizzato) |
+| Splash screen | ❌ | 20 sec di schermo nero prima del login (da investigare) |
+
+**Nota**: WiFi, luminosità e volume dovrebbero funzionare su hardware reale con NetworkManager e PulseAudio/PipeWire.
+
 ## Prossima sessione
+- Investigare problema splash screen (schermo nero all'avvio)
+- Test su hardware reale (non più VM)
 - Implementazione funzionalità "Chiedi aiuto a distanza" (richiede scelta tecnologia: RustDesk, VNC, etc.)
-- Eventuali fix emersi dai test
 - Preparazione per creazione ISO

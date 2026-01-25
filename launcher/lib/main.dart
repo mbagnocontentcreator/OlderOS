@@ -1,3 +1,4 @@
+import 'dart:io';
 import 'package:flutter/material.dart';
 import 'theme/olderos_theme.dart';
 import 'screens/home_screen.dart';
@@ -65,7 +66,22 @@ class _AppStartupState extends State<_AppStartup> {
   @override
   void initState() {
     super.initState();
+    // Nascondi lo splash nativo dopo il primo frame
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _hideNativeSplash();
+    });
     _initialize();
+  }
+
+  /// Nasconde lo splash screen nativo (se presente)
+  void _hideNativeSplash() {
+    if (Platform.isLinux) {
+      final hideScript = '/opt/olderos/splash/hide_splash.sh';
+      final file = File(hideScript);
+      if (file.existsSync()) {
+        Process.run('bash', [hideScript]);
+      }
+    }
   }
 
   Future<void> _initialize() async {

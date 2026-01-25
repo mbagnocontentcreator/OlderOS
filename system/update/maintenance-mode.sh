@@ -42,10 +42,14 @@ EOF"
             sudo cp "$AUTOSTART_BACKUP" "$AUTOSTART_FILE"
             echo "Kiosk Mode ripristinato."
         else
-            # Ricrea l'autostart del kiosk
+            # Ricrea l'autostart del kiosk (con splash nativo)
             sudo bash -c "cat > $AUTOSTART_FILE << 'EOF'
 # OlderOS Kiosk Mode
 unclutter -idle 1 &
+# Mostra splash nativo mentre Flutter si avvia
+if [ -f /opt/olderos/splash/show_splash.sh ]; then
+    /opt/olderos/splash/show_splash.sh &
+fi
 /opt/olderos/olderos_launcher &
 EOF"
             echo "Kiosk Mode configurato."

@@ -92,6 +92,17 @@ sudo rm -rf "$INSTALL_DIR"
 sudo cp -r "$BUILD_DIR" "$INSTALL_DIR"
 sudo chmod +x "$INSTALL_DIR/olderos_launcher"
 
+# Installa splash screen nativo
+echo "Installazione splash screen..."
+sudo mkdir -p "$INSTALL_DIR/splash"
+sudo cp "$LAUNCHER_DIR/linux/splash/"*.sh "$INSTALL_DIR/splash/" 2>/dev/null || true
+sudo chmod +x "$INSTALL_DIR/splash/"*.sh 2>/dev/null || true
+
+# Genera immagine splash (se ImageMagick disponibile)
+if [ -f "$INSTALL_DIR/splash/create_splash.sh" ]; then
+    sudo bash "$INSTALL_DIR/splash/create_splash.sh" || true
+fi
+
 echo ""
 echo -e "${GREEN}================================${NC}"
 echo -e "${GREEN}   Aggiornamento completato!   ${NC}"
